@@ -1,0 +1,31 @@
+<html>
+<head>
+<meta charset="utf-8"/>
+    <script src = "/socket.io/socket.io.js" > </script>
+    <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css">
+    <script type=text/javascript src="http://code.jquery.com/jquery-1.7.1.min.js"></script>
+    <script>
+        var socket = io.connect();
+            socket.on('datastatus', function (data) {
+                document.getelementById("result").innerhtml=data;
+            });
+    </script>
+    <script>
+    function submitForm(){
+      socket.emit('sendval', document.getElementById('txtmorse').value);
+    }
+    </script>
+</head>
+ 
+<body>
+<h1>Morsify Beagle v0.1</h1>
+<form name="senddata" id="morseform">
+<div class=form-group>
+    <input type="text" name="morsetext" id="txtmorse"/><p>
+    <input type="button" name="on" id="btn_send" value="Gönder" class="btn btn-default" onClick="submitForm();">
+    </p>
+    <div id="result"></div>
+</div>
+</form>
+</body>
+</html>
