@@ -1,9 +1,12 @@
 <html>
 <head>
 <meta charset="utf-8"/>
+    <title>BBControl v0.1:</title>
     <script src = "/socket.io/socket.io.js" > </script>
-    <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css">
-    <script type=text/javascript src="http://code.jquery.com/jquery-1.7.1.min.js"></script>
+    <link rel="stylesheet" href="themes/BBControl.min.css" />
+    <link rel="stylesheet" href="http://code.jquery.com/mobile/1.4.2/jquery.mobile.structure-1.4.2.min.css" />
+    <script src="http://code.jquery.com/jquery-1.10.2.min.js"></script>
+    <script src="http://code.jquery.com/mobile/1.4.2/jquery.mobile-1.4.2.min.js"></script>
     <script>
         var socket = io.connect();
             socket.on('datastatus', function (data) {
@@ -18,14 +21,19 @@
 </head>
  
 <body>
-<h1>Morsify Beagle v0.1</h1>
-<form name="senddata" id="morseform">
-<div class=form-group>
-    <input type="text" name="morsetext" id="txtmorse"/><p>
-    <input type="button" name="on" id="btn_send" value="Gönder" class="btn btn-default" onClick="submitForm();">
-    </p>
-    <div id="result"></div>
+<div data-role="page" data-theme="a">
+	<div data-role="header" data-position="inline">
+		<h1>BBControl v0.1</h1>
+	</div>
+    <div data-role="content" data-theme="a">
+        <pre>Enter your text into the text field<br/>Slider will change the light frequency.</pre>
+        <p>For any questions contact <a href="#" class="ui-link">mail</a>.</p>
+        <label for="txtmorse">Text to morsify:</label>
+        <input type="text" name="morsetext" id="txtmorse"/>
+        <input type="frequency" name="slider1" id="slider1" value="50" min="200" max="100" data-theme="a" />
+        <input type="button" name="on" id="btn_send" value="Gönder" class="btn btn-default" onClick="submitForm();">
+        <pre id="result"></pre>
+    </div>
 </div>
-</form>
 </body>
 </html>
