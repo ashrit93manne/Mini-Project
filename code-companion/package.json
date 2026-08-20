@@ -1,0 +1,15 @@
+{
+  "name": "code-companion-deptapp",
+  "version": "4.7.0",
+  "private": true,
+  "description": "Source, build and tests for the Code Companion (aXet.SAP Code Agents) .deptapp",
+  "scripts": {
+    "build": "python3 tools/build_deptapp.py --base baseline/aXet.SAP__Code_Agents_v4.6.2_export.deptapp --out build/aXet.SAP__Code_Agents_v4.7.0_export.deptapp",
+    "fixtures": "python3 tools/make_test_pdfs.py && python3 tools/make_special_pdfs.py && python3 tools/make_test_docx.py",
+    "harness": "node tests/harness/build-harness.js",
+    "test:parsers": "node tests/parsers.test.js",
+    "test:backend": "node tests/backend.test.js",
+    "test:browser": "node tests/browser.test.js",
+    "test": "npm run build && npm run harness && npm run test:parsers && npm run test:backend && npm run test:browser"
+  }
+}

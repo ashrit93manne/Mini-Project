@@ -1,0 +1,13 @@
+[Page 1]
+Code Companion Requirements
+1. The report must read table ZSD_ORDERS via a released CDS view.
+2. Authorization object S_TABU_NAM is checked before selection.
+Quotes: "curly" and ‘single’ — em-dash, en–dash, ellipsis…
+Symbols: 50% of €1,234.56 ± 0.5 °C © NTT DATA
+Package: ZLOCAL   Transport: DEVK900123
+
+[Page 2]
+Appendix A - Field Mapping
+VBELN  Sales Document  CHAR(10)
+POSNR  Item Number     NUMC(6)
+MATNR  Material        CHAR(40)

@@ -1,0 +1,573 @@
+/* =========================================================
+   24. FILE ATTACHMENTS
+   =========================================================
+
+   Composer geometry
+   -----------------
+   The composer is a fixed-height, absolutely-positioned strip and
+   everything inside it is anchored to that box. An attachment tray has
+   to add height without moving the message field or the send button, so
+   the height is expressed as:
+
+       --sca-composer-height =
+           --sca-composer-base-height + --sca-attachment-tray-height
+
+   Every breakpoint sets the BASE height; the tray height is 0 until the
+   controller puts data-sca-attachments="true" on <body>. The message
+   box and send button stay bottom-anchored, so they do not move — the
+   composer grows upward and the tray occupies the new space.
+
+   The declaration is repeated on `body` because a breakpoint may
+   redefine the base height on `body:has(...)`, and a calc() on :root
+   would resolve against :root's value rather than body's.
+   ========================================================= */
+
+:root,
+body {
+    --sca-attachment-tray-height: 0px;
+
+    --sca-composer-height:
+        calc(var(--sca-composer-base-height) + var(--sca-attachment-tray-height));
+
+    /*
+     * The message box is absolutely positioned, and each breakpoint
+     * gives it a different inset. The paperclip has to sit inside it at
+     * every size, so its position is expressed against these rather
+     * than against hard-coded numbers that would drift the moment a
+     * breakpoint is retuned. Keep them in step with sections 16, 22
+     * and 23E.
+     */
+    --sca-input-inset-left: 16px;
+    --sca-input-inset-bottom: 12px;
+
+    --sca-attach-size: 36px;
+    --sca-attach-gap: 8px;
+
+    /* Section 17's inset for the prompt-budget row. */
+    --sca-budget-inset-top: 10px;
+}
+
+body[data-sca-attachments="true"] {
+    --sca-attachment-tray-height: 46px;
+}
+
+/* ---------------------------------------------------------
+   24A. ATTACHMENT BAR
+   --------------------------------------------------------- */
+
+.sca-attachment-bar {
+    position: static;
+}
+
+.sca-attach-input {
+    position: absolute !important;
+
+    width: 1px !important;
+    height: 1px !important;
+
+    padding: 0 !important;
+    margin: -1px !important;
+
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+
+    white-space: nowrap !important;
+    border: 0 !important;
+}
+
+/* ---------------------------------------------------------
+   24B. PAPERCLIP BUTTON
+
+   Sits inside the left edge of the message box, vertically
+   centred on it and mirroring the send button on the right.
+   The textarea gains matching left padding in 24C so typed
+   text never runs underneath it.
+   --------------------------------------------------------- */
+
+.sca-attach-button {
+    position: absolute !important;
+
+    left:
+        calc(var(--sca-input-inset-left) + var(--sca-attach-gap)) !important;
+
+    bottom:
+        calc(
+            var(--sca-input-inset-bottom) +
+            (var(--sca-input-height) - var(--sca-attach-size)) / 2
+        ) !important;
+
+    top: auto !important;
+    right: auto !important;
+
+    z-index: 121 !important;
+
+    width: var(--sca-attach-size) !important;
+    height: var(--sca-attach-size) !important;
+
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+
+    padding: 0 !important;
+    margin: 0 !important;
+
+    border: 0 !important;
+    border-radius: 50% !important;
+
+    background: transparent !important;
+    color: var(--sca-muted) !important;
+
+    cursor: pointer;
+
+    transition:
+        background-color 120ms ease,
+        color 120ms ease;
+}
+
+.sca-attach-button:hover:not(:disabled) {
+    background: var(--sca-blue-soft) !important;
+    color: var(--sca-blue) !important;
+}
+
+.sca-attach-button:focus-visible {
+    outline: 2px solid var(--sca-blue) !important;
+    outline-offset: 2px !important;
+}
+
+.sca-attach-button:disabled {
+    color: #b6c2d0 !important;
+    cursor: not-allowed;
+    background: transparent !important;
+}
+
+.sca-attach-button.is-busy {
+    color: var(--sca-blue) !important;
+}
+
+.sca-attach-button svg {
+    display: block;
+    pointer-events: none;
+}
+
+/* ---------------------------------------------------------
+   24C. MESSAGE BOX — ROOM FOR THE PAPERCLIP
+
+   Section 23E sets the message box padding through
+   `body:has(.sca-header-host) .formio-component-userMessage
+   textarea`, so a bare `.formio-component-userMessage textarea`
+   rule here would lose on specificity and the typed text would
+   run underneath the paperclip. Both forms are therefore given:
+   the prefixed rule to win against 23E, and the bare one as the
+   fallback should the header host class ever change.
+   --------------------------------------------------------- */
+
+.formio-component-userMessage textarea,
+.formio-component-userMessage .form-control,
+body:has(.sca-header-host) .formio-component-userMessage textarea,
+body:has(.sca-header-host) .formio-component-userMessage .form-control {
+    padding-left:
+        calc(
+            var(--sca-attach-size) + var(--sca-attach-gap) * 2
+        ) !important;
+}
+
+/* ---------------------------------------------------------
+   24D. ATTACHED-FILE TRAY
+
+   Occupies the height the composer gained. Chips scroll
+   horizontally rather than wrapping, so the composer height
+   stays predictable however many files are attached.
+   --------------------------------------------------------- */
+
+.sca-attachment-tray {
+    position: absolute !important;
+
+    top: 6px !important;
+    right: 16px !important;
+    left: 16px !important;
+
+    z-index: 118 !important;
+
+    height: 34px !important;
+
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+
+    padding: 0 !important;
+    margin: 0 !important;
+
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+
+    scrollbar-width: thin;
+}
+
+.sca-attachment-tray[hidden] {
+    display: none !important;
+}
+
+.sca-attachment-tray::-webkit-scrollbar {
+    height: 4px;
+}
+
+.sca-attachment-tray::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+
+/* ---------------------------------------------------------
+   24E. FILE CHIPS
+   --------------------------------------------------------- */
+
+.sca-chip {
+    flex: 0 0 auto;
+
+    max-width: 320px;
+
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+
+    height: 28px;
+    padding: 0 6px 0 8px;
+
+    border: 1px solid var(--sca-border);
+    border-radius: 8px;
+
+    background: #ffffff;
+    color: var(--sca-text);
+
+    font-size: 12px;
+    line-height: 1;
+
+    white-space: nowrap;
+}
+
+.sca-chip-icon {
+    flex: 0 0 auto;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    min-width: 26px;
+    height: 16px;
+    padding: 0 4px;
+
+    border-radius: 4px;
+
+    background: var(--sca-blue-soft);
+    color: var(--sca-blue);
+
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+}
+
+.sca-chip-label {
+    flex: 1 1 auto;
+    min-width: 0;
+
+    overflow: hidden;
+    text-overflow: ellipsis;
+
+    font-weight: 600;
+}
+
+.sca-chip-detail {
+    flex: 0 0 auto;
+
+    color: var(--sca-muted);
+    font-size: 11px;
+}
+
+.sca-chip-remove {
+    flex: 0 0 auto;
+
+    width: 18px;
+    height: 18px;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    padding: 0;
+    margin: 0;
+
+    border: 0;
+    border-radius: 50%;
+
+    background: transparent;
+    color: var(--sca-muted);
+
+    font-size: 15px;
+    line-height: 1;
+
+    cursor: pointer;
+}
+
+.sca-chip-remove:hover {
+    background: #eef2f7;
+    color: var(--sca-text);
+}
+
+.sca-chip-remove:focus-visible {
+    outline: 2px solid var(--sca-blue);
+    outline-offset: 1px;
+}
+
+/* Parsing */
+
+.sca-chip-parsing {
+    border-style: dashed;
+    color: var(--sca-muted);
+}
+
+.sca-chip-parsing .sca-chip-icon {
+    background: transparent;
+    min-width: 16px;
+    padding: 0;
+}
+
+.sca-chip-spinner {
+    display: inline-block;
+
+    width: 12px;
+    height: 12px;
+
+    border: 2px solid var(--sca-blue-soft);
+    border-top-color: var(--sca-blue);
+    border-radius: 50%;
+
+    animation: sca-chip-spin 700ms linear infinite;
+}
+
+@keyframes sca-chip-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sca-chip-spinner {
+        animation-duration: 2400ms;
+    }
+}
+
+/* Rejected */
+
+.sca-chip-error {
+    border-color: #f3c3bd;
+    background: var(--sca-danger-bg);
+    color: var(--sca-danger);
+}
+
+.sca-chip-error .sca-chip-icon {
+    background: #f9d7d3;
+    color: var(--sca-danger);
+}
+
+.sca-chip-error .sca-chip-detail {
+    max-width: 190px;
+
+    overflow: hidden;
+    text-overflow: ellipsis;
+
+    color: var(--sca-danger);
+}
+
+/* Notice */
+
+.sca-chip-notice {
+    border-color: #f0d5a8;
+    background: var(--sca-warning-bg);
+    color: var(--sca-warning);
+
+    white-space: normal;
+    max-width: none;
+    height: auto;
+
+    padding: 5px 10px;
+    line-height: 1.3;
+}
+
+/* ---------------------------------------------------------
+   24F. ATTACHMENT COUNTER
+
+   Extends the existing prompt-budget readout rather than
+   adding a second row, so the composer keeps one line of
+   status instead of two competing ones.
+   --------------------------------------------------------- */
+
+.sca-attachment-counter {
+    /*
+     * The budget row is space-between with three items. Absorbing the
+     * free space here keeps the counter next to the character count it
+     * extends, and leaves the hint on the right.
+     */
+    margin-right: auto;
+
+    min-width: 0;
+
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    color: var(--sca-muted);
+    font-size: inherit;
+}
+
+.sca-attachment-counter.is-near-limit {
+    color: var(--sca-warning);
+    font-weight: 600;
+}
+
+.sca-attachment-counter.is-at-limit {
+    color: var(--sca-danger);
+    font-weight: 600;
+}
+
+.sca-attachment-counter[hidden] {
+    display: none !important;
+}
+
+/* ---------------------------------------------------------
+   24G. PROMPT BUDGET — SHIFTED BY THE TRAY
+
+   The budget row is top-anchored inside the composer, so it
+   is the one element that has to move down when the tray
+   appears.
+   --------------------------------------------------------- */
+
+.sca-prompt-budget-host,
+body:has(.sca-header-host) .sca-prompt-budget-host {
+    top:
+        calc(
+            var(--sca-budget-inset-top) + var(--sca-attachment-tray-height)
+        ) !important;
+}
+
+/* ---------------------------------------------------------
+   24H. ATTACHMENTS ON A SENT MESSAGE
+
+   Shown under the user's bubble so the conversation records
+   what the model was given, not just what was typed.
+   --------------------------------------------------------- */
+
+.sca-message-attachments {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+
+    margin-top: 8px;
+    padding-top: 8px;
+
+    border-top: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.sca-message-row.assistant .sca-message-attachments {
+    border-top-color: var(--sca-border);
+}
+
+.sca-message-attachment {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+
+    padding: 3px 8px;
+
+    border-radius: 6px;
+
+    background: rgba(255, 255, 255, 0.18);
+
+    font-size: 11px;
+    line-height: 1.4;
+}
+
+.sca-message-row.assistant .sca-message-attachment {
+    background: var(--sca-blue-soft);
+    color: var(--sca-blue);
+}
+
+.sca-message-attachment-kind {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    opacity: 0.85;
+}
+
+.sca-message-attachment-name {
+    font-weight: 600;
+}
+
+.sca-message-attachment-note {
+    opacity: 0.8;
+}
+
+/* ---------------------------------------------------------
+   24I. HIDDEN ATTACHMENT STATE FIELDS
+   --------------------------------------------------------- */
+
+.formio-component-attachmentsText,
+.formio-component-attachmentsJson {
+    display: none !important;
+}
+
+/* ---------------------------------------------------------
+   24J. TABLET AND MOBILE
+   --------------------------------------------------------- */
+
+/*
+ * Desktop density (section 23E) moves the message box in to 14px and
+ * down to 9px, so the paperclip follows it. The variables are declared
+ * on the same selector 23E uses, so they resolve in the same scope.
+ */
+
+@media (min-width: 901px) {
+    :root,
+    body,
+    body:has(.sca-header-host) {
+        --sca-input-inset-left: 14px;
+        --sca-input-inset-bottom: 9px;
+
+        --sca-attach-size: 34px;
+
+        --sca-budget-inset-top: 7px;
+    }
+}
+
+@media (max-width: 900px) {
+    body[data-sca-attachments="true"] {
+        --sca-attachment-tray-height: 44px;
+    }
+
+    .sca-chip {
+        max-width: 210px;
+    }
+}
+
+/*
+ * Section 22's small-screen block keeps the message box at the base
+ * inset but shrinks everything around it, so only the control size
+ * changes here.
+ */
+
+@media (max-width: 620px) {
+    :root,
+    body,
+    body:has(.sca-header-host) {
+        --sca-input-inset-left: 16px;
+        --sca-input-inset-bottom: 12px;
+
+        --sca-attach-size: 32px;
+    }
+
+    .sca-chip {
+        max-width: 165px;
+    }
+
+    .sca-chip-detail {
+        display: none;
+    }
+}

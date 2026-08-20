@@ -1,0 +1,178 @@
+/* =========================================================
+   25. APPLICATION CHROME — HARDENED MENU REMOVAL
+   =========================================================
+
+   Section 23B already listed the conventional toggle class names and the
+   hamburger was still on screen, because the aXet shell uses none of
+   them. This section widens the net to what the control actually looks
+   like in markup rather than what it might be called, and the
+   SCA-36 script in the controller removes whatever still survives.
+
+   Two mechanisms, on purpose:
+     - CSS applies before first paint, so the control never flashes;
+     - the script catches markup no selector could have predicted, and
+       handles a header the shell mounts after the application.
+
+   Everything here is scoped with body:has(.sca-header-host) so no other
+   aXet application is affected.
+   ========================================================= */
+
+/* ---------------------------------------------------------
+   25A. ANYTHING THE CONTROLLER HAS IDENTIFIED
+
+   The script tags what it finds; this rule makes the removal
+   survive a later re-style by the shell.
+   --------------------------------------------------------- */
+
+body [data-sca-chrome-hidden="true"] {
+    display: none !important;
+
+    width: 0 !important;
+    height: 0 !important;
+
+    margin: 0 !important;
+    padding: 0 !important;
+
+    border: 0 !important;
+
+    opacity: 0 !important;
+    visibility: hidden !important;
+
+    pointer-events: none !important;
+}
+
+/* ---------------------------------------------------------
+   25B. MENU GLYPHS OUTSIDE THE APPLICATION
+
+   Icon fonts put the glyph in the class name. Hiding the
+   icon's clickable parent — rather than the icon alone —
+   avoids leaving an empty but still-clickable button.
+
+   :not() guards keep this away from the application's own
+   surface, including the composer's paperclip.
+   --------------------------------------------------------- */
+
+body:has(.sca-header-host)
+    :is(button, a, [role="button"]):not(.formio-form *):not(.sca-header *):not(#sca-attach-button):has(
+        > :is(i, span, svg, em):is(
+                [class*="fa-bars"],
+                [class*="fa-navicon"],
+                [class*="fa-reorder"],
+                [class*="bi-list"],
+                [class*="icon-menu"],
+                [class*="menu-icon"],
+                [class*="glyphicon-menu-hamburger"],
+                [class*="mdi-menu"],
+                [class*="pi-bars"]
+            )
+    ) {
+    display: none !important;
+
+    pointer-events: none !important;
+}
+
+/*
+ * The same glyphs when the shell renders them without a
+ * wrapping button.
+ */
+
+body:has(.sca-header-host)
+    :is(i, span, em):not(.formio-form *):not(.sca-header *):is(
+        [class*="fa-bars"],
+        [class*="fa-navicon"],
+        [class*="fa-reorder"],
+        [class*="bi-list"],
+        [class*="glyphicon-menu-hamburger"],
+        [class*="mdi-menu"]
+    ) {
+    display: none !important;
+
+    pointer-events: none !important;
+}
+
+/* ---------------------------------------------------------
+   25C. TOGGLES IDENTIFIED BY ACCESSIBLE NAME
+
+   A shell that names its control properly for screen readers
+   is identifiable without knowing its class names at all.
+   --------------------------------------------------------- */
+
+body:has(.sca-header-host)
+    :is(button, a, [role="button"]):not(.formio-form *):not(.sca-header *):not(#sca-attach-button):is(
+        [aria-label*="menu" i],
+        [aria-label*="navigation" i],
+        [aria-label*="sidebar" i],
+        [aria-label*="sidenav" i],
+        [aria-label*="drawer" i],
+        [title*="toggle menu" i],
+        [title*="toggle navigation" i],
+        [title*="toggle sidebar" i],
+        [aria-controls*="sidebar" i],
+        [aria-controls*="sidenav" i],
+        [aria-controls*="drawer" i],
+        [aria-controls*="offcanvas" i],
+        [data-toggle="offcanvas"],
+        [data-bs-toggle="offcanvas"],
+        [data-widget="pushmenu"]
+    ) {
+    display: none !important;
+
+    pointer-events: none !important;
+}
+
+/* ---------------------------------------------------------
+   25D. CLASS-NAMED TOGGLES
+
+   Kept as a superset of the original 23B list, including the
+   naming conventions Angular Material and PrimeNG shells use.
+   --------------------------------------------------------- */
+
+body:has(.sca-header-host)
+    :not(.formio-form *):not(.sca-header *):is(
+        .navbar-toggler,
+        .navbar-toggle,
+        .sidebar-toggle,
+        .sidebar-toggler,
+        .sidenav-toggle,
+        .menu-toggle,
+        .menu-toggler,
+        .nav-toggle,
+        .drawer-toggle,
+        .hamburger,
+        .hamburger-button,
+        .hamburger-menu,
+        .hamburger-icon,
+        [class*="hamburger" i],
+        [class*="burger-menu" i],
+        [class*="menu-button" i],
+        [class*="toggle-sidebar" i],
+        [class*="sidebar-trigger" i]
+    ) {
+    display: none !important;
+
+    width: 0 !important;
+    height: 0 !important;
+
+    margin: 0 !important;
+    padding: 0 !important;
+
+    border: 0 !important;
+
+    opacity: 0 !important;
+    visibility: hidden !important;
+
+    pointer-events: none !important;
+}
+
+/* ---------------------------------------------------------
+   25E. RECLAIM THE SPACE THE TOGGLE OCCUPIED
+
+   Without this the shell's brand keeps the gap the removed
+   control used to fill, and the header reads as misaligned.
+   --------------------------------------------------------- */
+
+body:has(.sca-header-host)
+    :is(.navbar-brand, .app-brand, .header-brand, .brand, .logo) {
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+}
