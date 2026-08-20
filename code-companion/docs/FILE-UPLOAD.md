@@ -1,6 +1,6 @@
 # File attachment with text extraction
 
-> Code Companion v4.7.0 — controller SCA-37
+> Code Companion v5.0.0 — controller SCA-37 (v2)
 
 Delivers the first of the three items listed as *Planned Next Steps* in
 the Code Companion product documentation §8.2:
@@ -12,32 +12,69 @@ This version covers the unstructured half — Word, PDF and plain text.
 Structured sources are not built; the architecture is shaped so adding
 them is a small, contained change (see [Adding a format](#adding-a-format)).
 
+## Version note: why this is v2
+
+**v4.7.0 built the file picker entirely in script** — a `<button>` and
+an `<input type="file">` manufactured with `document.createElement` and
+positioned with CSS `calc()` against assumptions about the message box's
+exact DOM. It passed every local test, including a browser loading the
+literal built export, and rendered **nothing at all** when imported into
+the real platform — no error, no console warning reachable without
+opening devtools, just an absent control.
+
+The same release's menu-toggle removal (SCA-36) *did* work in
+production. The difference points at the cause: SCA-36 only ever tags
+elements the platform had already rendered; the v1 picker manufactured
+new ones and guessed at their placement. One instance of that pattern
+worked in this sandbox and failed for real; a second instance (the
+conversation-history sidebar, built at the same time as this rewrite)
+would have carried the identical risk if built the same way.
+
+**v2 removes that risk for the picker.** The file input is now a
+**declared Form.io `file` component** (key: `attachmentPicker`), added
+in `tools/build_deptapp.py` exactly the way every other control on this
+screen — the send button, the message textarea — is declared. Form.io
+renders it; this script never creates it, never positions it by
+calculation, and only listens for the native `change` event bubbling up
+from whatever real `<input type="file">` that component contains. If the
+CSS restyling below doesn't match the platform's exact internal markup,
+the worst case is Form.io's own plainer default drop-zone appearance —
+still fully functional, never invisible.
+
+See [`CHAT-HISTORY.md`](CHAT-HISTORY.md) for the full account of what
+was learned building the sidebar alongside this rewrite, including two
+real bugs the test suite caught before shipping (an invisible-input
+click-hijack and an unreachable mobile toggle) that are worth reading if
+extending either feature.
+
 ## What the developer sees
 
-A paperclip sits inside the left edge of the message box, opposite the
-send button. Choosing a file adds a chip above the message box showing
-the file name, a live "reading…" state, and then how many characters
-were extracted. The prompt-budget line grows a second clause —
-*"· 2 files, 993 chars attached"* — so the size of the request is
-visible before it is sent. Chips are removable; the composer returns to
-its normal height when the last one goes.
+A compact "Attach files" pill sits in its own thin bar at the top of the
+composer, with the attached-file chips filling the rest of that row.
+Choosing a file shows a chip with the file name, a live "reading…"
+state, and then how many characters were extracted. The prompt-budget
+line grows a second clause — *"· 2 files, 993 chars attached"* — so the
+size of the request is visible before it is sent. Chips are removable.
 
 On send, the extracted text travels with the message. The sent bubble
 records which files went with it, so the conversation still makes sense
 when read back later.
 
-### Why the paperclip is where it is
+### Why the attachment bar is a separate row, not inside the textarea
 
-Inside the message box, mirroring the send button. This is the
-convention every current assistant UI uses, and it reads correctly: the
-control belongs to the message being composed, not to the page or the
-application.
-
-The two alternatives were considered and rejected. In the header, it
-would have been detached from the message it modifies and would have
-implied a document library rather than a per-message attachment. Beside
-the send button, it would have crowded the primary action — two adjacent
-circular buttons, one of which destroys a draft if mis-clicked.
+v1 put the trigger *inside* the message box, overlapping the textarea,
+because that placement is the convention most assistant UIs use and it
+read as belonging to the message rather than the page. That overlap is
+exactly what a declared Form.io component can no longer do cleanly: it
+renders as a sibling with its own wrapper div, not as a child this
+script can position inside another component's box. Rather than fight
+that with more absolute-positioning calculations — the same category of
+fragility that caused v1's failure — the picker and the tray now share
+a dedicated strip above the message box, sized once via a CSS variable
+(`--sca-attachment-bar-height`) the same way the tray's height was
+already handled. The composer grows by that fixed amount unconditionally
+now, rather than dynamically when a file is first attached, which also
+avoids a layout jump under the developer's cursor.
 
 ## Supported formats
 
@@ -233,13 +270,44 @@ will say so.
 
 ## Mounting
 
-The paperclip, tray and file input are built in script and re-mounted
-whenever they go missing, rather than declared as Form.io components.
-Form.io re-renders the form on almost every state change and sanitises
-HTML element content, so a declarative `<input type="file">` is liable to
-be stripped or destroyed mid-conversation. The two hidden fields *are*
-declared components, because only declared components appear in the
-submission.
+Everything the developer interacts with is now a **declared** Form.io
+component: the `attachmentPicker` file field, the `attachmentTrayHost`
+htmlelement the chips render into, and the two hidden
+`attachmentsText`/`attachmentsJson` fields the submission carries. This
+script's job is to find what Form.io already rendered and attach
+behaviour to it — a single delegated `change` listener on `document`,
+matching the input inside `attachmentPicker` by CSS selector, plus a
+light, idempotent relabelling of the drop-zone's default text
+(`decoratePicker()` in `sca-attachment-ui.js`) — never to construct or
+position the controls itself.
+
+This is a direct change from v1, which built the paperclip and its
+`<input type="file">` in script under the theory that Form.io's
+"sanitises HTML element content on re-render" behaviour would strip a
+declared file input. That theory was never actually confirmed, and the
+approach it led to is what failed silently in production; see
+"Version note" above.
+
+Two consequences worth knowing when touching this code:
+
+- **Removal is Form.io's own job now.** The picker's default file-list
+  UI is hidden via CSS (`sca-native-file-list-hidden`) so it doesn't
+  duplicate the richer chip tray, but nothing in this script ever reads
+  or writes the file component's own value array — the delegated
+  listener reads `event.target.files` directly off the native input at
+  the moment of the `change` event, before Form.io's own value
+  processing runs, so this pipeline is unaffected by whatever Form.io
+  does with the picker's value afterward.
+- **The dropzone needs its own positioning context.** Form.io's default
+  file template overlays a full-size, invisible `<input>` on top of its
+  visible drop-zone so any click anywhere on the pill opens the file
+  dialog. That input is `position: absolute; inset: 0`, which sizes
+  against the nearest ancestor that has `position` set at all — get that
+  wrong and the invisible input escapes the pill and silently intercepts
+  clicks meant for whatever sits next to it (in this build, the tray's
+  remove buttons; caught by `tests/browser.test.js` before shipping).
+  `.fileSelector`/`[ref="fileDrop"]` in `attachments.css` are given
+  `position: relative` specifically to contain it.
 
 ## Adding a format
 

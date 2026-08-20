@@ -1,0 +1,421 @@
+/* =========================================================
+   26. CONVERSATION HISTORY SIDEBAR
+   =========================================================
+
+   Layout strategy
+   ----------------
+   .formio-form is already a `display:flex; flex-direction:column`
+   column stack (section 2), and the composer already breaks out of
+   that flow with `position:absolute` (section 15) anchored to
+   .formio-form's bounds. The sidebar reuses that SAME mechanism rather
+   than introducing a different layout system (grid) alongside it:
+
+     - the sidebar panel is `position:absolute; left:0; top:0; bottom:0`,
+       taken out of the column flow entirely;
+     - the two remaining visible blocks (the app header, the chat
+       surface) get `margin-left: var(--sca-sidebar-width)` to clear it;
+     - the composer's own `left` (currently `0 !important` in section 15)
+       is overridden to the same width, so it doesn't extend under the
+       panel.
+
+   On screens under 900px the panel becomes an overlay instead of a
+   permanent column — position stays absolute, but it now spans the
+   full width and slides in only when data-sca-sidebar-open="true" is
+   set on <body>, exactly mirroring how data-sca-attachments already
+   toggles composer height. The margin-left/composer-left overrides are
+   scoped to the desktop breakpoint only, so mobile content never
+   permanently loses width to a panel that isn't visible by default.
+   ========================================================= */
+
+:root,
+body {
+    --sca-sidebar-width: 240px;
+}
+
+/* ---------------------------------------------------------
+   26A. DESKTOP — PERMANENT LEFT COLUMN
+   --------------------------------------------------------- */
+
+@media (min-width: 901px) {
+    .sca-sidebar-panel {
+        position: absolute !important;
+
+        top: 0 !important;
+        left: 0 !important;
+        bottom: 0 !important;
+
+        z-index: 130 !important;
+
+        width: var(--sca-sidebar-width) !important;
+
+        display: flex !important;
+        flex-direction: column !important;
+
+        overflow: hidden !important;
+
+        background: #f8fafc !important;
+        border-right: 1px solid var(--sca-border) !important;
+    }
+
+    /*
+     * Both margin-left AND an explicit reduced width: the elements this
+     * targets carry their own width:100% (computed against
+     * .formio-form, not against "the space left after the sidebar"),
+     * so margin-left alone would push them 240px past the right edge
+     * rather than narrowing them.
+     */
+    .sca-header-host,
+    .sca-chat-surface-host {
+        margin-left: var(--sca-sidebar-width) !important;
+        width: calc(100% - var(--sca-sidebar-width)) !important;
+    }
+
+    body:has(.sca-header-host) .formio-component-composer,
+    body:has(.sca-header-host) .sca-composer {
+        left: var(--sca-sidebar-width) !important;
+        width: calc(100% - var(--sca-sidebar-width)) !important;
+    }
+
+    /* The desktop panel is always visible; the toggle button is not needed. */
+    #sca-sidebar-toggle {
+        display: none !important;
+    }
+}
+
+/* ---------------------------------------------------------
+   26B. TABLET / MOBILE — OVERLAY
+   --------------------------------------------------------- */
+
+@media (max-width: 900px) {
+    .sca-sidebar-panel {
+        position: absolute !important;
+
+        top: 0 !important;
+        left: 0 !important;
+        bottom: 0 !important;
+
+        z-index: 200 !important;
+
+        width: min(82vw, 300px) !important;
+
+        display: flex !important;
+        flex-direction: column !important;
+
+        overflow: hidden !important;
+
+        background: #f8fafc !important;
+        border-right: 1px solid var(--sca-border) !important;
+
+        box-shadow: 0 8px 28px rgba(15, 23, 42, 0.18) !important;
+
+        transform: translateX(-100%);
+
+        transition: transform 160ms ease;
+    }
+
+    body[data-sca-sidebar-open="true"] .sca-sidebar-panel {
+        transform: translateX(0);
+    }
+
+    /*
+     * A translucent scrim behind the panel, closing it on tap outside —
+     * implemented as a ::before on the form so no extra DOM is needed.
+     */
+    body[data-sca-sidebar-open="true"] .formio-form::before {
+        content: "";
+
+        position: absolute;
+        inset: 0;
+
+        z-index: 190;
+
+        background: rgba(15, 23, 42, 0.32);
+    }
+}
+
+/* ---------------------------------------------------------
+   26C. SIDEBAR TOGGLE (mobile/tablet only, 26A hides it on desktop)
+   --------------------------------------------------------- */
+
+#sca-sidebar-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 34px;
+    height: 34px;
+
+    border: 0;
+    border-radius: 8px;
+
+    background: transparent;
+    color: var(--sca-text);
+
+    font-size: 16px;
+
+    cursor: pointer;
+
+    /*
+     * Above the mobile sidebar (z-index 200) and its scrim (190), not
+     * below them: the same control opens AND closes the panel, so it
+     * has to stay reachable once the panel it toggles is covering the
+     * header it lives in. Harmless on desktop, where 26A hides this
+     * button outright.
+     */
+    position: relative;
+    z-index: 210;
+}
+
+#sca-sidebar-toggle:hover {
+    background: var(--sca-blue-soft);
+    color: var(--sca-blue);
+}
+
+/* ---------------------------------------------------------
+   26D. SIDEBAR HEADER
+   --------------------------------------------------------- */
+
+.sca-sidebar-header-host {
+    flex: 0 0 auto;
+}
+
+.sca-sidebar-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+
+    padding: 16px 14px 8px;
+}
+
+.sca-sidebar-title {
+    color: var(--sca-text);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+}
+
+#sca-history-refresh {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 24px;
+    height: 24px;
+
+    border: 0;
+    border-radius: 6px;
+
+    background: transparent;
+    color: var(--sca-muted);
+
+    font-size: 13px;
+    cursor: pointer;
+}
+
+#sca-history-refresh:hover {
+    background: var(--sca-blue-soft);
+    color: var(--sca-blue);
+}
+
+#sca-new-conversation {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    margin: 4px 10px 12px;
+    padding: 9px 12px;
+
+    border: 1px solid var(--sca-blue);
+    border-radius: 10px;
+
+    background: #ffffff;
+    color: var(--sca-blue);
+
+    font-size: 13px;
+    font-weight: 600;
+
+    cursor: pointer;
+
+    transition: background-color 120ms ease;
+}
+
+#sca-new-conversation:hover {
+    background: var(--sca-blue-soft);
+}
+
+#sca-new-conversation::before {
+    content: "+";
+
+    font-size: 16px;
+    line-height: 1;
+}
+
+/* ---------------------------------------------------------
+   26E. CONVERSATION LIST (the datagrid Form.io renders)
+   --------------------------------------------------------- */
+
+.formio-component-conversationsGrid {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+
+    overflow-y: auto !important;
+
+    padding: 0 8px 12px !important;
+    margin: 0 !important;
+}
+
+/*
+ * Flatten Form.io's row/column wrapper divs so each datagrid row reads
+ * as one compact, clickable-looking card rather than a dense form.
+ */
+.formio-component-conversationsGrid .datagrid-row,
+.formio-component-conversationsGrid table tbody tr {
+    display: flex !important;
+    align-items: center !important;
+
+    margin-bottom: 6px !important;
+    padding: 8px 10px !important;
+
+    border: 1px solid var(--sca-border) !important;
+    border-radius: 10px !important;
+
+    background: #ffffff !important;
+}
+
+.formio-component-conversationsGrid table tbody tr:hover {
+    border-color: var(--sca-blue) !important;
+}
+
+.formio-component-conversationsGrid table,
+.formio-component-conversationsGrid table thead {
+    width: 100% !important;
+}
+
+.formio-component-conversationsGrid table thead {
+    display: none !important;
+}
+
+.formio-component-conversationsGrid table tbody tr {
+    display: grid !important;
+    grid-template-columns: 1fr auto auto !important;
+    align-items: center !important;
+    gap: 4px 8px !important;
+}
+
+.formio-component-conversationsGrid .formio-component-title input,
+.formio-component-conversationsGrid .formio-component-title .form-control {
+    border: 0 !important;
+    background: transparent !important;
+    padding: 0 !important;
+
+    color: var(--sca-text) !important;
+    font-size: 12.5px !important;
+    font-weight: 600 !important;
+
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+
+    pointer-events: none;
+}
+
+.formio-component-conversationsGrid .formio-component-updatedAtLabel {
+    grid-column: 1;
+    grid-row: 2;
+}
+
+.formio-component-conversationsGrid .formio-component-updatedAtLabel input,
+.formio-component-conversationsGrid .formio-component-updatedAtLabel .form-control {
+    border: 0 !important;
+    background: transparent !important;
+    padding: 0 !important;
+
+    color: var(--sca-muted) !important;
+    font-size: 11px !important;
+
+    pointer-events: none;
+}
+
+.formio-component-conversationsGrid label {
+    display: none !important;
+}
+
+.formio-component-conversationsGrid .formio-component-open button,
+.formio-component-conversationsGrid .formio-component-delete button {
+    width: 26px !important;
+    height: 26px !important;
+    min-width: 26px !important;
+
+    padding: 0 !important;
+
+    border-radius: 6px !important;
+
+    font-size: 12px !important;
+}
+
+.formio-component-conversationsGrid .formio-component-open button {
+    background: var(--sca-blue-soft) !important;
+    color: var(--sca-blue) !important;
+    border: 0 !important;
+}
+
+.formio-component-conversationsGrid .formio-component-delete button {
+    background: transparent !important;
+    color: var(--sca-muted) !important;
+    border: 0 !important;
+}
+
+.formio-component-conversationsGrid .formio-component-delete button:hover {
+    background: var(--sca-danger-bg) !important;
+    color: var(--sca-danger) !important;
+}
+
+/*
+ * Form.io's own "Add Another" affordance is suppressed by
+ * disableAddingRemovingRows on the component, but hide it defensively
+ * too in case a platform version renders it regardless.
+ */
+.formio-component-conversationsGrid .formio-button-add-row,
+.formio-component-conversationsGrid [ref="addRow"] {
+    display: none !important;
+}
+
+/* Empty state: Form.io renders nothing for a zero-row datagrid, which
+   reads as "broken" rather than "no history yet" — this fills that gap. */
+.formio-component-conversationsGrid table tbody:empty::after {
+    content: "No past conversations yet.";
+
+    display: block;
+
+    padding: 20px 6px;
+
+    color: var(--sca-muted);
+    font-size: 12px;
+    text-align: center;
+}
+
+/* ---------------------------------------------------------
+   26F. HIDDEN LOAD-CONVERSATIONS TRIGGER
+
+   A real, clickable Form.io button — never removed from the DOM,
+   only made visually absent, so ScaHistory can still .click() it.
+   Matches the technique section 20 already uses for messagesJson etc.
+   --------------------------------------------------------- */
+
+.formio-component-loadConversations {
+    position: absolute !important;
+
+    width: 1px !important;
+    height: 1px !important;
+
+    padding: 0 !important;
+    margin: -1px !important;
+
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+
+    white-space: nowrap !important;
+    border: 0 !important;
+}

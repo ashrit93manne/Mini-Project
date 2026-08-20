@@ -11,7 +11,7 @@ producing a half-patched application.
 Usage:
     python3 tools/build_deptapp.py \
         --base  path/to/aXet.SAP__Code_Agents_v4.6.2_export.deptapp \
-        --out   build/aXet.SAP__Code_Agents_v4.7.0_export.deptapp
+        --out   build/aXet.SAP__Code_Agents_v5.0.0_export.deptapp
 """
 import argparse
 import json
@@ -19,20 +19,31 @@ import os
 import re
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from conversation_history import (  # noqa: E402
+    SIDEBAR_TOGGLE_HTML,
+    add_conversation_history,
+)
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 
 APP_NODE_ID = "5439b0c95ce6e66d"
 FORM_NODE_ID = "21d415924e0e4841"
+UI_TAB_ID = "cab2b2152508727e"
+BACKEND_TAB_ID = "6a7c6094850c144e"
 
-NEW_VERSION_ALIAS = "v4.7.0"
+NEW_VERSION_ALIAS = "v5.0.0"
 NEW_VERSION_MESSAGE = (
-    "Code Companion - file attachment with text extraction "
-    "(Word, PDF, text) and removal of the application menu toggle"
+    "Code Companion - native Form.io file picker (replacing the "
+    "injected paperclip), persistent conversation history with a "
+    "sidebar, and the v4.7.0 menu-toggle removal / attachment "
+    "extraction changes"
 )
 
 CONTROLLER_VERSION_OLD = '"5.0.1"'
-CONTROLLER_VERSION_NEW = '"6.0.0"'
+CONTROLLER_VERSION_NEW = '"7.0.0"'
 
 
 class PatchError(RuntimeError):
@@ -68,6 +79,7 @@ CONTROLLER_MODULES = [
     "sca-attachment-manager.js",
     "sca-attachment-ui.js",
     "sca-app-chrome.js",
+    "sca-history.js",
 ]
 
 
@@ -108,11 +120,13 @@ def patch_controller(source):
     source = patch(
         source,
         " * Version 5.0.0\n",
-        " * Version 6.0.0\n"
+        " * Version 7.0.0\n"
         " *\n"
         " * Changes vs 5.0.1:\n"
         " *   SCA-36   application-chrome cleanup (menu toggle removal)\n"
-        " *   SCA-37   file attachment: paperclip, tray, extraction, budget\n"
+        " *   SCA-37   file attachment: native Form.io file picker,\n"
+        " *            tray, extraction, budget (v2: no injected DOM)\n"
+        " *   SCA-38   conversation history sidebar (list/load/delete)\n"
         " *   SCA-15G  attachments shown on the sent message bubble\n"
         " *   SCA-22C2 submission gate and attachment payload write\n",
         "controller header",
@@ -448,11 +462,18 @@ def patch_controller(source):
         '        ".sca-message-action, .sca-code-copy-action, .sca-proceed-chip"\n'
         "      );",
         "      /*\n"
-        "       * The paperclip and the chip remove buttons are handled\n"
-        "       * first: they must never reach the Send path below.\n"
+        "       * The chip remove buttons and the history sidebar's\n"
+        "       * links are handled first: they must never reach the\n"
+        "       * Send path below.\n"
         "       */\n"
         '      if (typeof ScaAttachmentUi !== "undefined") {\n'
         "        if (ScaAttachmentUi.handleClick(event)) {\n"
+        "          return;\n"
+        "        }\n"
+        "      }\n"
+        "\n"
+        '      if (typeof ScaHistory !== "undefined") {\n'
+        "        if (ScaHistory.handleClick(event)) {\n"
         "          return;\n"
         "        }\n"
         "      }\n"
@@ -602,6 +623,20 @@ def patch_controller(source):
         '    scaLog("error", "SCA-37", "attachment-init-failed", {\n'
         "      message: error && error.message\n"
         "    });\n"
+        "  }\n"
+        "\n"
+        "  /* =========================================================\n"
+        "   * SCA-38 — CONVERSATION HISTORY\n"
+        "   * ========================================================= */\n"
+        "\n"
+        "  try {\n"
+        '    if (typeof ScaHistory !== "undefined") {\n'
+        "      ScaHistory.init(controller);\n"
+        "    }\n"
+        "  } catch (error) {\n"
+        '    scaLog("error", "SCA-38", "history-init-failed", {\n'
+        "      message: error && error.message\n"
+        "    });\n"
         "  }\n",
         "P15 bootstrap",
     )
@@ -662,6 +697,8 @@ def patch_css(css):
         + read_source("src", "css", "attachments.css").strip()
         + "\n\n\n"
         + read_source("src", "css", "chrome.css").strip()
+        + "\n\n\n"
+        + read_source("src", "css", "history.css").strip()
         + "\n"
     )
 
@@ -800,6 +837,22 @@ def patch_form(form_node, controller_source):
             break
     else:
         raise PatchError("form: serverSideJavaScript component not found")
+
+    # The mobile/tablet sidebar toggle lives inside the app's own header —
+    # a plain <button>, edited straight into HTML this platform already
+    # renders correctly (proven by the header itself displaying), not
+    # DOM this script manufactures at runtime.
+    for component in components:
+        if component.get("key") == "sapCodeAgentHeader":
+            component["content"] = patch(
+                component["content"],
+                '<div class="sca-brand">',
+                SIDEBAR_TOGGLE_HTML + '\n\n  <div class="sca-brand">',
+                "header sidebar toggle",
+            )
+            break
+    else:
+        raise PatchError("form: sapCodeAgentHeader component not found")
 
     return form_node
 
@@ -1225,7 +1278,13 @@ def main():
     clear_node = by_name["Clear Conversation"]
     clear_node["func"] = patch_clear_conversation(clear_node["func"])
 
-    # 5. Version
+    # 5. Conversation history — persistence, sidebar, and the backend
+    #    wiring connecting them. Adds new graph nodes rather than
+    #    patching existing ones, so it runs after every other patch has
+    #    already located and edited its own anchors.
+    add_conversation_history(export, FORM_NODE_ID, UI_TAB_ID, BACKEND_TAB_ID)
+
+    # 6. Version
     info = export["info"]["deptAppVersionInfo"]
     info["alias"] = NEW_VERSION_ALIAS
     info["descriptionMessage"] = NEW_VERSION_MESSAGE

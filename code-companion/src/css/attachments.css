@@ -2,184 +2,62 @@
    24. FILE ATTACHMENTS
    =========================================================
 
+   Version 2 layout
+   -----------------
+   Version 1 placed a script-manufactured paperclip button absolutely
+   inside the message textarea. It worked everywhere it was tested and
+   did not appear in the real deployment — the safer replacement is a
+   DECLARED Form.io `file` component (key: attachmentPicker) and a
+   DECLARED `htmlelement` tray host (key: attachmentTrayHost), both
+   added as real form components in build_deptapp.py. Form.io renders
+   them the same way it renders the send button and the message box,
+   which is proven to work; this stylesheet only styles what already
+   exists, never manufactures it.
+
+   That component can no longer sit visually inside the textarea (it is
+   a sibling component with its own wrapper div, not a child our script
+   controls), so the layout changes to a slim toolbar strip ABOVE the
+   message box, occupying its own row inside the composer:
+
+       composer
+        +-- attachment bar   (picker trigger + chip tray, ALWAYS present)
+        +-- prompt budget    (unchanged content, moved down to clear the bar)
+        +-- message textarea (unchanged, no longer needs left padding)
+        +-- send button      (unchanged)
+
    Composer geometry
    -----------------
-   The composer is a fixed-height, absolutely-positioned strip and
-   everything inside it is anchored to that box. An attachment tray has
-   to add height without moving the message field or the send button, so
-   the height is expressed as:
+   --sca-composer-height = --sca-composer-base-height + --sca-attachment-bar-height
 
-       --sca-composer-height =
-           --sca-composer-base-height + --sca-attachment-tray-height
-
-   Every breakpoint sets the BASE height; the tray height is 0 until the
-   controller puts data-sca-attachments="true" on <body>. The message
-   box and send button stay bottom-anchored, so they do not move — the
-   composer grows upward and the tray occupies the new space.
-
-   The declaration is repeated on `body` because a breakpoint may
-   redefine the base height on `body:has(...)`, and a calc() on :root
-   would resolve against :root's value rather than body's.
+   Unlike v1, the bar's height is now CONSTANT rather than conditional
+   on whether a file is attached. A composer that resizes the instant
+   the first file is picked shifts the chat log's scroll position under
+   the user's cursor; reserving the row unconditionally avoids that
+   layout jump entirely, at the cost of a fixed handful of pixels
+   whether or not anything is attached — a trade worth making for a
+   steadier feel.
    ========================================================= */
 
 :root,
 body {
-    --sca-attachment-tray-height: 0px;
+    --sca-attachment-bar-height: 40px;
 
     --sca-composer-height:
-        calc(var(--sca-composer-base-height) + var(--sca-attachment-tray-height));
-
-    /*
-     * The message box is absolutely positioned, and each breakpoint
-     * gives it a different inset. The paperclip has to sit inside it at
-     * every size, so its position is expressed against these rather
-     * than against hard-coded numbers that would drift the moment a
-     * breakpoint is retuned. Keep them in step with sections 16, 22
-     * and 23E.
-     */
-    --sca-input-inset-left: 16px;
-    --sca-input-inset-bottom: 12px;
-
-    --sca-attach-size: 36px;
-    --sca-attach-gap: 8px;
+        calc(var(--sca-composer-base-height) + var(--sca-attachment-bar-height));
 
     /* Section 17's inset for the prompt-budget row. */
-    --sca-budget-inset-top: 10px;
-}
-
-body[data-sca-attachments="true"] {
-    --sca-attachment-tray-height: 46px;
+    --sca-budget-inset-top: calc(var(--sca-attachment-bar-height) + 6px);
 }
 
 /* ---------------------------------------------------------
    24A. ATTACHMENT BAR
+
+   Top-anchored inside the composer, spanning its width. The
+   picker sits at the left; the tray fills the remaining space
+   and scrolls horizontally if it holds more chips than fit.
    --------------------------------------------------------- */
 
-.sca-attachment-bar {
-    position: static;
-}
-
-.sca-attach-input {
-    position: absolute !important;
-
-    width: 1px !important;
-    height: 1px !important;
-
-    padding: 0 !important;
-    margin: -1px !important;
-
-    overflow: hidden !important;
-    clip: rect(0, 0, 0, 0) !important;
-
-    white-space: nowrap !important;
-    border: 0 !important;
-}
-
-/* ---------------------------------------------------------
-   24B. PAPERCLIP BUTTON
-
-   Sits inside the left edge of the message box, vertically
-   centred on it and mirroring the send button on the right.
-   The textarea gains matching left padding in 24C so typed
-   text never runs underneath it.
-   --------------------------------------------------------- */
-
-.sca-attach-button {
-    position: absolute !important;
-
-    left:
-        calc(var(--sca-input-inset-left) + var(--sca-attach-gap)) !important;
-
-    bottom:
-        calc(
-            var(--sca-input-inset-bottom) +
-            (var(--sca-input-height) - var(--sca-attach-size)) / 2
-        ) !important;
-
-    top: auto !important;
-    right: auto !important;
-
-    z-index: 121 !important;
-
-    width: var(--sca-attach-size) !important;
-    height: var(--sca-attach-size) !important;
-
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-
-    padding: 0 !important;
-    margin: 0 !important;
-
-    border: 0 !important;
-    border-radius: 50% !important;
-
-    background: transparent !important;
-    color: var(--sca-muted) !important;
-
-    cursor: pointer;
-
-    transition:
-        background-color 120ms ease,
-        color 120ms ease;
-}
-
-.sca-attach-button:hover:not(:disabled) {
-    background: var(--sca-blue-soft) !important;
-    color: var(--sca-blue) !important;
-}
-
-.sca-attach-button:focus-visible {
-    outline: 2px solid var(--sca-blue) !important;
-    outline-offset: 2px !important;
-}
-
-.sca-attach-button:disabled {
-    color: #b6c2d0 !important;
-    cursor: not-allowed;
-    background: transparent !important;
-}
-
-.sca-attach-button.is-busy {
-    color: var(--sca-blue) !important;
-}
-
-.sca-attach-button svg {
-    display: block;
-    pointer-events: none;
-}
-
-/* ---------------------------------------------------------
-   24C. MESSAGE BOX — ROOM FOR THE PAPERCLIP
-
-   Section 23E sets the message box padding through
-   `body:has(.sca-header-host) .formio-component-userMessage
-   textarea`, so a bare `.formio-component-userMessage textarea`
-   rule here would lose on specificity and the typed text would
-   run underneath the paperclip. Both forms are therefore given:
-   the prefixed rule to win against 23E, and the bare one as the
-   fallback should the header host class ever change.
-   --------------------------------------------------------- */
-
-.formio-component-userMessage textarea,
-.formio-component-userMessage .form-control,
-body:has(.sca-header-host) .formio-component-userMessage textarea,
-body:has(.sca-header-host) .formio-component-userMessage .form-control {
-    padding-left:
-        calc(
-            var(--sca-attach-size) + var(--sca-attach-gap) * 2
-        ) !important;
-}
-
-/* ---------------------------------------------------------
-   24D. ATTACHED-FILE TRAY
-
-   Occupies the height the composer gained. Chips scroll
-   horizontally rather than wrapping, so the composer height
-   stays predictable however many files are attached.
-   --------------------------------------------------------- */
-
-.sca-attachment-tray {
+.sca-attachment-bar-host {
     position: absolute !important;
 
     top: 6px !important;
@@ -188,14 +66,203 @@ body:has(.sca-header-host) .formio-component-userMessage .form-control {
 
     z-index: 118 !important;
 
-    height: 34px !important;
+    height: calc(var(--sca-attachment-bar-height) - 8px) !important;
 
     display: flex !important;
     align-items: center !important;
     gap: 8px !important;
 
-    padding: 0 !important;
     margin: 0 !important;
+    padding: 0 !important;
+
+    overflow: visible !important;
+}
+
+/*
+ * Elsewhere in this stylesheet (sections 15/16/18), a container's
+ * children are always addressed directly as .formio-component-<key> —
+ * .sca-composer > .formio-component-userMessage works with no
+ * intermediate wrapper to flatten, and the same holds here. This rule
+ * only flattens a .form-group Form.io may render INSIDE one of those
+ * named components (around its own internal markup), never the named
+ * component's own root: that root is what carries the flex sizing
+ * rules below (.formio-component-attachmentPicker { flex: ... }), and
+ * collapsing it away with display:contents was what let its child
+ * input's position:absolute escape to the whole bar's width instead of
+ * staying inside the picker — the bug that made the invisible file
+ * input intercept clicks meant for the tray next to it.
+ */
+.sca-attachment-bar-host .form-group,
+.sca-attachment-bar-host .card-body {
+    display: contents !important;
+}
+
+/* ---------------------------------------------------------
+   24B. FILE PICKER — DECLARED FORM.IO FILE COMPONENT
+
+   Form.io's default file component renders a full drop-zone
+   with instructional text. That default is a correct, working
+   control on its own — everything below only compacts its
+   appearance into a small pill; if any selector here misses
+   the platform's exact internal markup, the component still
+   renders and still works, just with Form.io's own, plainer
+   look, which is a safe degradation rather than a silent one.
+   --------------------------------------------------------- */
+
+.formio-component-attachmentPicker {
+    flex: 0 0 auto !important;
+
+    width: auto !important;
+    max-width: 168px !important;
+
+    margin: 0 !important;
+}
+
+.formio-component-attachmentPicker label {
+    display: none !important;
+}
+
+.formio-component-attachmentPicker .form-group,
+.formio-component-attachmentPicker .formio-component {
+    margin: 0 !important;
+}
+
+/*
+ * The drop-zone / browse control, whatever its exact inner markup.
+ * Compacted into a small pill matching the app's existing button
+ * language (rounded, bordered, blue-on-hover) rather than the
+ * default large dashed rectangle.
+ */
+.formio-component-attachmentPicker .fileSelector,
+.formio-component-attachmentPicker [ref="fileDrop"] {
+    /*
+     * A containing block for the real <input type="file"> Form.io's
+     * default template overlays on top of this dropzone at full size
+     * (opacity 0, position:absolute) so clicks anywhere on the visible
+     * pill open the file dialog. Without position:relative here, that
+     * input positions against the nearest ancestor that HAS one —
+     * which turned out to be the whole attachment bar — stretching an
+     * invisible click target across the tray sitting next to it.
+     */
+    position: relative !important;
+
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 6px !important;
+
+    width: auto !important;
+    max-width: 100% !important;
+    height: calc(var(--sca-attachment-bar-height) - 8px) !important;
+
+    padding: 0 12px !important;
+    margin: 0 !important;
+
+    border: 1px solid var(--sca-border) !important;
+    border-radius: 999px !important;
+
+    background: #ffffff !important;
+
+    color: var(--sca-muted) !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    white-space: nowrap !important;
+
+    cursor: pointer;
+
+    transition:
+        background-color 120ms ease,
+        color 120ms ease,
+        border-color 120ms ease;
+}
+
+.formio-component-attachmentPicker .fileSelector:hover,
+.formio-component-attachmentPicker [ref="fileDrop"]:hover {
+    background: var(--sca-blue-soft) !important;
+    border-color: var(--sca-blue) !important;
+    color: var(--sca-blue) !important;
+}
+
+/*
+ * A small paperclip glyph ahead of the (relabelled, by script) text,
+ * matching the icon language used elsewhere in the composer.
+ */
+.formio-component-attachmentPicker .fileSelector::before,
+.formio-component-attachmentPicker [ref="fileDrop"]::before {
+    content: "📎";
+
+    font-size: 13px;
+    line-height: 1;
+}
+
+.formio-component-attachmentPicker .fileSelector i,
+.formio-component-attachmentPicker [ref="fileDrop"] i {
+    display: none !important;
+}
+
+/*
+ * Form.io's default dropzone leads with its own instructional text —
+ * "Drop files to attach, or" — ahead of the browse link decoratePicker()
+ * (sca-attachment-ui.js) relabels to "Attach files". Left alone that
+ * reads as a duplicated, verbose control; hidden here so the compact
+ * pill shows only the one label. The <a> itself is untouched and stays
+ * the real click target Form.io wires up.
+ */
+.formio-component-attachmentPicker .fileSelector span,
+.formio-component-attachmentPicker [ref="fileDrop"] span {
+    display: none !important;
+}
+
+.formio-component-attachmentPicker .fileSelector a,
+.formio-component-attachmentPicker [ref="fileDrop"] a,
+.formio-component-attachmentPicker .browse {
+    color: inherit !important;
+    text-decoration: none !important;
+}
+
+/* Our own chip tray replaces this; see 24D. */
+.formio-component-attachmentPicker .sca-native-file-list-hidden {
+    display: none !important;
+}
+
+.formio-component-attachmentPicker.sca-picker-disabled,
+.formio-component-attachmentPicker[aria-disabled="true"] {
+    opacity: 0.55;
+    pointer-events: none;
+}
+
+/* ---------------------------------------------------------
+   24C. MESSAGE BOX
+
+   No longer needs extra left padding: the picker lives in its
+   own row above the textarea now, not overlapping it.
+   --------------------------------------------------------- */
+
+/* (intentionally no rules here in v2 — kept as a section marker
+   so a future change has an obvious place to look first) */
+
+/* ---------------------------------------------------------
+   24D. ATTACHED-FILE TRAY
+
+   The declared htmlelement (attachmentTrayHost) this script
+   populates. Sits beside the picker, filling the remaining
+   width of the attachment bar; scrolls horizontally rather
+   than wrapping, so the bar's height stays constant however
+   many files are attached.
+   --------------------------------------------------------- */
+
+#sca-attachment-tray {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+
+    height: 100% !important;
+
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+
+    margin: 0 !important;
+    padding: 0 !important;
 
     overflow-x: auto !important;
     overflow-y: hidden !important;
@@ -203,15 +270,15 @@ body:has(.sca-header-host) .formio-component-userMessage .form-control {
     scrollbar-width: thin;
 }
 
-.sca-attachment-tray[hidden] {
+#sca-attachment-tray[hidden] {
     display: none !important;
 }
 
-.sca-attachment-tray::-webkit-scrollbar {
+#sca-attachment-tray::-webkit-scrollbar {
     height: 4px;
 }
 
-.sca-attachment-tray::-webkit-scrollbar-thumb {
+#sca-attachment-tray::-webkit-scrollbar-thumb {
     background: #cbd5e1;
     border-radius: 4px;
 }
@@ -223,7 +290,7 @@ body:has(.sca-header-host) .formio-component-userMessage .form-control {
 .sca-chip {
     flex: 0 0 auto;
 
-    max-width: 320px;
+    max-width: 260px;
 
     display: inline-flex;
     align-items: center;
@@ -266,7 +333,7 @@ body:has(.sca-header-host) .formio-component-userMessage .form-control {
 }
 
 .sca-chip-label {
-    flex: 1 1 auto;
+    flex: 0 1 auto;
     min-width: 0;
 
     overflow: hidden;
@@ -401,11 +468,6 @@ body:has(.sca-header-host) .formio-component-userMessage .form-control {
    --------------------------------------------------------- */
 
 .sca-attachment-counter {
-    /*
-     * The budget row is space-between with three items. Absorbing the
-     * free space here keeps the counter next to the character count it
-     * extends, and leaves the hint on the right.
-     */
     margin-right: auto;
 
     min-width: 0;
@@ -433,19 +495,12 @@ body:has(.sca-header-host) .formio-component-userMessage .form-control {
 }
 
 /* ---------------------------------------------------------
-   24G. PROMPT BUDGET — SHIFTED BY THE TRAY
-
-   The budget row is top-anchored inside the composer, so it
-   is the one element that has to move down when the tray
-   appears.
+   24G. PROMPT BUDGET — SHIFTED BY THE ATTACHMENT BAR
    --------------------------------------------------------- */
 
 .sca-prompt-budget-host,
 body:has(.sca-header-host) .sca-prompt-budget-host {
-    top:
-        calc(
-            var(--sca-budget-inset-top) + var(--sca-attachment-tray-height)
-        ) !important;
+    top: var(--sca-budget-inset-top) !important;
 }
 
 /* ---------------------------------------------------------
@@ -518,53 +573,44 @@ body:has(.sca-header-host) .sca-prompt-budget-host {
    24J. TABLET AND MOBILE
    --------------------------------------------------------- */
 
-/*
- * Desktop density (section 23E) moves the message box in to 14px and
- * down to 9px, so the paperclip follows it. The variables are declared
- * on the same selector 23E uses, so they resolve in the same scope.
- */
-
-@media (min-width: 901px) {
-    :root,
-    body,
-    body:has(.sca-header-host) {
-        --sca-input-inset-left: 14px;
-        --sca-input-inset-bottom: 9px;
-
-        --sca-attach-size: 34px;
-
-        --sca-budget-inset-top: 7px;
-    }
-}
-
 @media (max-width: 900px) {
-    body[data-sca-attachments="true"] {
-        --sca-attachment-tray-height: 44px;
+    :root,
+    body {
+        --sca-attachment-bar-height: 38px;
+    }
+
+    .formio-component-attachmentPicker {
+        max-width: 140px !important;
     }
 
     .sca-chip {
-        max-width: 210px;
+        max-width: 190px;
     }
 }
-
-/*
- * Section 22's small-screen block keeps the message box at the base
- * inset but shrinks everything around it, so only the control size
- * changes here.
- */
 
 @media (max-width: 620px) {
     :root,
-    body,
-    body:has(.sca-header-host) {
-        --sca-input-inset-left: 16px;
-        --sca-input-inset-bottom: 12px;
+    body {
+        --sca-attachment-bar-height: 36px;
+    }
 
-        --sca-attach-size: 32px;
+    .formio-component-attachmentPicker {
+        max-width: 44px !important;
+    }
+
+    /*
+     * Too narrow for the label text; the paperclip glyph alone
+     * (24B) still reads as an attach control at this width.
+     */
+    .formio-component-attachmentPicker .fileSelector span,
+    .formio-component-attachmentPicker [ref="fileDrop"] span,
+    .formio-component-attachmentPicker .fileSelector a,
+    .formio-component-attachmentPicker [ref="fileDrop"] a {
+        display: none !important;
     }
 
     .sca-chip {
-        max-width: 165px;
+        max-width: 140px;
     }
 
     .sca-chip-detail {

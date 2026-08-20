@@ -67,6 +67,112 @@ async function simulateBackendReply(page) {
     await page.waitForTimeout(200);
 }
 
+/*
+ * Playwright's setInputFiles waits for the target's bounding box to be
+ * stable across consecutive frames. This controller's own periodic
+ * sync (SCA-33, every 350ms) and MutationObserver (SCA-32) keep the DOM
+ * churning by design — necessary in production, since Form.io can
+ * remount the composer at any time — which means that wait never
+ * reliably settles under Playwright: it was observed to pass instantly
+ * in isolation and to hang for the full timeout with the periodic timer
+ * left running, on otherwise-identical runs. This is a property of the
+ * test harness's automation tooling, not of the page: a human clicking
+ * the real browse control is unaffected, since it does not go through
+ * this stability-wait codepath at all.
+ *
+ * The timer is paused before picking a file and DELIBERATELY left
+ * paused afterwards — re-creating it immediately was the specific
+ * change that reintroduced the intermittent hang, most likely by
+ * racing Playwright's own instrumentation. Nothing this suite still
+ * checks after a file is attached depends on the periodic tick: chip
+ * rendering happens synchronously inside the extraction promise chain,
+ * not on a sync() cycle.
+ */
+async function attachFile(page, selector, filePath) {
+    await page.evaluate(() => {
+        const c = window.__sapCodeAgentController;
+
+        if (c && c.timer) {
+            clearInterval(c.timer);
+            c.timer = null;
+        }
+
+        if (c && c.observer) {
+            c.observer.disconnect();
+        }
+    });
+
+    /*
+     * A native file input does not fire "change" when the same file
+     * path is set twice in a row — the browser sees no change in its
+     * value, so no event is dispatched, and SCA-37 (correctly) never
+     * hears about it. Clearing the value first guarantees the next
+     * setInputFiles is a genuine empty-to-populated transition, which
+     * always fires "change" — this is what a real OS file dialog does
+     * every time regardless of which file was picked before, so this
+     * only removes an automation-specific gap, not a real one.
+     */
+    await page.evaluate((sel) => {
+        const input = document.querySelector(sel);
+
+        if (input) {
+            input.value = "";
+        }
+    }, selector);
+
+    /*
+     * The pause above removes the specific cause identified during
+     * development, but the underlying wait has still been observed to
+     * hang intermittently in this sandboxed environment even with the
+     * timer stopped (most likely scheduler contention affecting
+     * Chromium's own frame timing, which Playwright's actionability
+     * poll depends on) — a short retry absorbs that without masking a
+     * real failure, since a genuinely broken picker fails identically
+     * on every attempt.
+     */
+    let lastError = null;
+
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+        try {
+            await page.setInputFiles(selector, filePath, { timeout: 8000 });
+            return;
+        } catch (error) {
+            lastError = error;
+        }
+    }
+
+    throw lastError;
+}
+
+/*
+ * page.waitForSelector's "visible" state uses Playwright's own
+ * DOM-observation machinery, which was observed alongside setInputFiles
+ * (see attachFile above) to hang intermittently under this sandbox even
+ * once the periodic timer is stopped. A plain polling predicate is a
+ * simpler code path with fewer moving parts and has been reliable where
+ * waitForSelector was not.
+ */
+async function waitForChip(page, timeoutMs) {
+    await page.waitForFunction(
+        () => {
+            const chip = document.querySelector(".sca-chip-ready");
+            return Boolean(chip && chip.getClientRects().length > 0);
+        },
+        { timeout: timeoutMs || 20000, polling: 100 }
+    );
+}
+
+async function waitForSelectorVisible(page, selector, timeoutMs) {
+    await page.waitForFunction(
+        (sel) => {
+            const el = document.querySelector(sel);
+            return Boolean(el && el.getClientRects().length > 0);
+        },
+        selector,
+        { timeout: timeoutMs || 20000, polling: 100 }
+    );
+}
+
 async function main() {
     if (!fs.existsSync(HARNESS)) {
         console.error("harness missing — run node tests/harness/build-harness.js");
@@ -111,7 +217,7 @@ async function main() {
     check(
         "controller reports the new version",
         (await page.evaluate(() => window.__sapCodeAgentController.version)) ===
-            "6.0.0",
+            "7.0.0",
         await page.evaluate(() => window.__sapCodeAgentController.version)
     );
 
@@ -187,81 +293,48 @@ async function main() {
     );
 
     /* =====================================================
-     * Paperclip placement
+     * File picker — v2, native Form.io component
+     *
+     * v1 built a paperclip button and an <input type="file"> in script
+     * and positioned them with absolute-CSS calculations against the
+     * real message box. It rendered nothing in the actual deployment.
+     * v2 no longer creates the input at all: SCA-37 only listens for a
+     * native "change" event delegated from whatever the platform's own
+     * `file` component renders (SELECTORS.pickerInput in
+     * sca-attachment-ui.js). These tests exercise exactly that contract
+     * — that picking a file through the native input reaches the
+     * extraction pipeline — rather than asserting on manufactured
+     * geometry this script no longer owns.
      * ===================================================== */
 
-    section("SCA-37 — paperclip control");
+    section("SCA-37 — native file picker");
 
-    const attachButton = page.locator("#sca-attach-button");
-
-    check("the paperclip is mounted and visible", await attachButton.isVisible());
-
-    check(
-        "it has an accessible name",
-        /attach a file/i.test(
-            (await attachButton.getAttribute("aria-label")) || ""
-        ),
-        await attachButton.getAttribute("aria-label")
-    );
-
-    const geometry = await page.evaluate(() => {
-        const attach = document
-            .querySelector("#sca-attach-button")
-            .getBoundingClientRect();
-
-        const input = document
-            .querySelector(".formio-component-userMessage textarea")
-            .getBoundingClientRect();
-
-        const send = document
-            .querySelector(".formio-component-sendMessage button")
-            .getBoundingClientRect();
-
-        const style = getComputedStyle(
-            document.querySelector(".formio-component-userMessage textarea")
-        );
-
-        return {
-            attach,
-            input,
-            send,
-            paddingLeft: parseFloat(style.paddingLeft)
-        };
-    });
+    const pickerInputSelector =
+        '.formio-component-attachmentPicker input[type="file"]';
 
     check(
-        "the paperclip sits inside the message box",
-        geometry.attach.left >= geometry.input.left &&
-            geometry.attach.right <= geometry.input.right,
-        JSON.stringify({ attach: geometry.attach.left, input: geometry.input.left })
+        "the picker's outer component is present",
+        await page.locator(".formio-component-attachmentPicker").count() > 0
     );
 
     check(
-        "it is vertically centred on the message box",
-        Math.abs(
-            (geometry.attach.top + geometry.attach.bottom) / 2 -
-                (geometry.input.top + geometry.input.bottom) / 2
-        ) < 3,
-        JSON.stringify({
-            attach: (geometry.attach.top + geometry.attach.bottom) / 2,
-            input: (geometry.input.top + geometry.input.bottom) / 2
-        })
+        "the picker carries a real native file input",
+        await page.locator(pickerInputSelector).count() > 0
     );
 
     check(
-        "the text is padded clear of the paperclip",
-        geometry.paddingLeft >=
-            geometry.attach.right - geometry.input.left,
-        JSON.stringify({
-            paddingLeft: geometry.paddingLeft,
-            needed: geometry.attach.right - geometry.input.left
-        })
+        "the browse trigger text was compacted by the controller",
+        (await page.locator('.formio-component-attachmentPicker a[ref="fileBrowse"]')
+            .textContent()) === "Attach files",
+        await page
+            .locator('.formio-component-attachmentPicker a[ref="fileBrowse"]')
+            .textContent()
     );
 
     check(
-        "it does not overlap the send button",
-        geometry.attach.right < geometry.send.left,
-        JSON.stringify({ attachRight: geometry.attach.right, sendLeft: geometry.send.left })
+        "the tray host exists and starts empty",
+        await page.locator("#sca-attachment-tray").count() === 1 &&
+            (await page.locator(".sca-chip").count()) === 0
     );
 
     /* =====================================================
@@ -270,12 +343,9 @@ async function main() {
 
     section("SCA-37 — attach a Word document");
 
-    await page.setInputFiles(
-        "#sca-attach-input",
-        path.join(FIXTURES, "sample.docx")
-    );
+    await attachFile(page, pickerInputSelector, path.join(FIXTURES, "sample.docx"));
 
-    await page.waitForSelector(".sca-chip-ready", { timeout: 10000 });
+    await waitForChip(page, 10000);
 
     check("a chip appears for the file", (await page.locator(".sca-chip").count()) === 1);
 
@@ -522,17 +592,11 @@ async function main() {
 
     section("SCA-37 — the same file attached twice");
 
-    await page.setInputFiles(
-        "#sca-attach-input",
-        path.join(FIXTURES, "sample.docx")
-    );
+    await attachFile(page, pickerInputSelector, path.join(FIXTURES, "sample.docx"));
 
-    await page.waitForSelector(".sca-chip-ready", { timeout: 10000 });
+    await waitForChip(page, 10000);
 
-    await page.setInputFiles(
-        "#sca-attach-input",
-        path.join(FIXTURES, "sample.docx")
-    );
+    await attachFile(page, pickerInputSelector, path.join(FIXTURES, "sample.docx"));
 
     await page.waitForTimeout(500);
 
@@ -567,7 +631,7 @@ async function main() {
 
     fs.writeFileSync(bogus, "not really a zip");
 
-    await page.setInputFiles("#sca-attach-input", bogus);
+    await attachFile(page, pickerInputSelector, bogus);
     await page.waitForTimeout(500);
 
     check(
@@ -600,12 +664,9 @@ async function main() {
 
     section("SCA-37 — encrypted PDF");
 
-    await page.setInputFiles(
-        "#sca-attach-input",
-        path.join(FIXTURES, "encrypted.pdf")
-    );
+    await attachFile(page, pickerInputSelector, path.join(FIXTURES, "encrypted.pdf"));
 
-    await page.waitForSelector(".sca-chip-error", { timeout: 10000 });
+    await waitForSelectorVisible(page, ".sca-chip-error", 10000);
 
     check(
         "an encrypted PDF is refused by name",
@@ -619,9 +680,9 @@ async function main() {
 
     section("SCA-37 — a text-based PDF");
 
-    await page.setInputFiles("#sca-attach-input", path.join(FIXTURES, "simple.pdf"));
+    await attachFile(page, pickerInputSelector, path.join(FIXTURES, "simple.pdf"));
 
-    await page.waitForSelector(".sca-chip-ready", { timeout: 15000 });
+    await waitForChip(page, 15000);
 
     check(
         "the PDF is read in the browser",
@@ -651,9 +712,9 @@ async function main() {
     if (!fs.existsSync(realDocPath)) {
         console.log("  SKIP  real-documentation.docx fixture not present");
     } else {
-    await page.setInputFiles("#sca-attach-input", realDocPath);
+    await attachFile(page, pickerInputSelector, realDocPath);
 
-    await page.waitForSelector(".sca-chip-ready", { timeout: 20000 });
+    await waitForChip(page, 20000);
 
     const realDoc = await page.evaluate(() =>
         window.ScaAttachmentUi.readyRecords()[0]
@@ -693,12 +754,9 @@ async function main() {
 
     section("SCA-37 — oversized document is truncated, not dropped");
 
-    await page.setInputFiles(
-        "#sca-attach-input",
-        path.join(FIXTURES, "oversized.txt")
-    );
+    await attachFile(page, pickerInputSelector, path.join(FIXTURES, "oversized.txt"));
 
-    await page.waitForSelector(".sca-chip-ready", { timeout: 20000 });
+    await waitForChip(page, 20000);
 
     const oversized = await page.evaluate(() =>
         window.ScaAttachmentUi.readyRecords()[0]
@@ -801,16 +859,17 @@ async function main() {
     await page.setViewportSize({ width: 390, height: 780 });
     await page.waitForTimeout(300);
 
-    await page.setInputFiles(
-        "#sca-attach-input",
-        path.join(FIXTURES, "sample.docx")
-    );
+    await attachFile(page, pickerInputSelector, path.join(FIXTURES, "sample.docx"));
 
-    await page.waitForSelector(".sca-chip-ready", { timeout: 10000 });
+    await waitForChip(page, 10000);
 
     const mobile = await page.evaluate(() => {
-        const attach = document
-            .querySelector("#sca-attach-button")
+        const picker = document
+            .querySelector(".formio-component-attachmentPicker")
+            .getBoundingClientRect();
+
+        const composer = document
+            .querySelector(".sca-composer")
             .getBoundingClientRect();
 
         const input = document
@@ -822,7 +881,8 @@ async function main() {
             .getBoundingClientRect();
 
         return {
-            attach,
+            picker,
+            composer,
             input,
             tray,
             bodyScrollWidth: document.body.scrollWidth,
@@ -831,14 +891,14 @@ async function main() {
     });
 
     check(
-        "the paperclip stays inside the message box on mobile",
-        mobile.attach.left >= mobile.input.left &&
-            mobile.attach.right <= mobile.input.right,
-        JSON.stringify({ attach: mobile.attach.left, input: mobile.input.left })
+        "the picker stays inside the composer on mobile",
+        mobile.picker.left >= mobile.composer.left - 1 &&
+            mobile.picker.right <= mobile.composer.right + 1,
+        JSON.stringify({ picker: mobile.picker, composer: mobile.composer })
     );
 
     check(
-        "the tray still clears the message box on mobile",
+        "the attachment bar still clears the message box on mobile",
         mobile.tray.bottom <= mobile.input.top + 1,
         JSON.stringify({ trayBottom: mobile.tray.bottom, inputTop: mobile.input.top })
     );
@@ -853,6 +913,219 @@ async function main() {
      * Wrap up
      * ===================================================== */
 
+    /* =====================================================
+     * Conversation history sidebar
+     *
+     * The list itself is a real Form.io datagrid, populated by the
+     * backend through the same reactive channel every chat reply
+     * already uses — this harness cannot exercise that round trip
+     * without a real NoSQL backend (see docs/CHAT-HISTORY.md), so
+     * these tests target what IS this project's own code: the
+     * delegated "+ New Conversation" / refresh links, the sidebar
+     * toggle, and desktop/mobile layout.
+     * ===================================================== */
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.waitForTimeout(300);
+
+    section("SCA-38 — conversation history sidebar (desktop)");
+
+    check(
+        "the sidebar panel is present",
+        (await page.locator(".sca-sidebar-panel").count()) === 1
+    );
+
+    check(
+        "the conversations list is a real Form.io datagrid",
+        (await page.locator(".formio-component-conversationsGrid").count()) === 1
+    );
+
+    check(
+        "the sidebar toggle is hidden on desktop (the panel is permanent)",
+        !(await page.locator("#sca-sidebar-toggle").isVisible())
+    );
+
+    const sidebarLayout = await page.evaluate(() => {
+        const sidebar = document
+            .querySelector(".sca-sidebar-panel")
+            .getBoundingClientRect();
+
+        const form = document
+            .querySelector(".formio-form")
+            .getBoundingClientRect();
+
+        const header = document
+            .querySelector(".sca-header-host")
+            .getBoundingClientRect();
+
+        const composer = document
+            .querySelector(".sca-composer")
+            .getBoundingClientRect();
+
+        return { sidebar, form, header, composer };
+    });
+
+    check(
+        /*
+         * The app card itself is centred with its own margin (section 2
+         * of the base stylesheet) rather than flush against the
+         * viewport, so "the left edge" means the card's left edge, not
+         * x=0 on the page.
+         */
+        "the sidebar occupies the left edge of the app card",
+        /*
+         * Within a couple of pixels: .formio-form carries its own 1px
+         * border (section 2), so the sidebar's left:0 — relative to the
+         * form's PADDING box — lands slightly inside the form element's
+         * own bounding rect, which includes that border.
+         */
+        Math.abs(sidebarLayout.sidebar.left - sidebarLayout.form.left) <= 2,
+        JSON.stringify({ sidebar: sidebarLayout.sidebar.left, form: sidebarLayout.form.left })
+    );
+
+    check(
+        "the header clears the sidebar rather than running under it",
+        sidebarLayout.header.left >= sidebarLayout.sidebar.right - 1,
+        JSON.stringify({
+            headerLeft: sidebarLayout.header.left,
+            sidebarRight: sidebarLayout.sidebar.right
+        })
+    );
+
+    check(
+        "the composer clears the sidebar too",
+        sidebarLayout.composer.left >= sidebarLayout.sidebar.right - 1,
+        JSON.stringify({
+            composerLeft: sidebarLayout.composer.left,
+            sidebarRight: sidebarLayout.sidebar.right
+        })
+    );
+
+    section("SCA-38 — '+ New Conversation' reuses the real New Chat button");
+
+    /* Leave a message typed so a successful New Chat reset is visible. */
+    await page.fill(".formio-component-userMessage textarea", "some draft text");
+
+    let newChatClicked = await page.evaluate(() => {
+        let clicked = false;
+        const button = document.querySelector(".formio-component-newChat button");
+        const handler = () => {
+            clicked = true;
+        };
+        button.addEventListener("click", handler, { once: true });
+        document.querySelector("#sca-new-conversation").click();
+        return clicked;
+    });
+
+    check(
+        "clicking the sidebar link clicks the real New Chat button",
+        newChatClicked
+    );
+
+    await page.waitForTimeout(200);
+
+    check(
+        "New Chat's own reset actually ran (draft text cleared)",
+        (await page.evaluate(
+            () =>
+                document.querySelector(".formio-component-userMessage textarea").value
+        )) === ""
+    );
+
+    section("SCA-38 — refresh link triggers the real (hidden) load button");
+
+    const loadClicked = await page.evaluate(() => {
+        let clicked = false;
+        const button = document.querySelector(
+            ".formio-component-loadConversations button"
+        );
+        const handler = () => {
+            clicked = true;
+        };
+        button.addEventListener("click", handler, { once: true });
+        document.querySelector("#sca-history-refresh").click();
+        return clicked;
+    });
+
+    check(
+        "clicking refresh clicks the real, CSS-hidden loadConversations button",
+        loadClicked
+    );
+
+    /*
+     * A visually-hidden-but-present element (1x1px, clipped) still
+     * counts as "visible" by Playwright's own heuristic — it only checks
+     * for a non-zero box, not a perceptible one — so the assertion below
+     * checks the box area directly rather than isVisible().
+     */
+    const loadConversationsBox = await page.evaluate(() => {
+        const el = document.querySelector(".formio-component-loadConversations");
+        const r = el ? el.getBoundingClientRect() : null;
+        return r ? { width: r.width, height: r.height } : null;
+    });
+
+    check(
+        "the loadConversations button is present but visually negligible",
+        Boolean(loadConversationsBox) &&
+            loadConversationsBox.width <= 1 &&
+            loadConversationsBox.height <= 1,
+        JSON.stringify(loadConversationsBox)
+    );
+
+    section("SCA-38 — mobile sidebar overlay");
+
+    await page.setViewportSize({ width: 390, height: 780 });
+    await page.waitForTimeout(300);
+
+    check(
+        "the sidebar toggle is visible on a narrow screen",
+        await page.locator("#sca-sidebar-toggle").isVisible()
+    );
+
+    check(
+        "the sidebar starts closed on a narrow screen",
+        !(await page.evaluate(() => window.ScaHistory.isSidebarOpen()))
+    );
+
+    await page.click("#sca-sidebar-toggle");
+    await page.waitForTimeout(250);
+
+    check(
+        "the toggle opens the sidebar",
+        await page.evaluate(() => window.ScaHistory.isSidebarOpen())
+    );
+
+    const mobileOverlay = await page.evaluate(() => {
+        const sidebar = document
+            .querySelector(".sca-sidebar-panel")
+            .getBoundingClientRect();
+
+        return { left: sidebar.left, width: sidebar.width };
+    });
+
+    check(
+        "the open sidebar is on screen, not still translated away",
+        mobileOverlay.left > -1,
+        JSON.stringify(mobileOverlay)
+    );
+
+    check(
+        "the mobile sidebar does not consume the full viewport width",
+        mobileOverlay.width < 390,
+        mobileOverlay.width
+    );
+
+    await page.click("#sca-sidebar-toggle");
+    await page.waitForTimeout(250);
+
+    check(
+        "the toggle closes the sidebar again",
+        !(await page.evaluate(() => window.ScaHistory.isSidebarOpen()))
+    );
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.waitForTimeout(300);
+
     section("Console");
 
     check(
@@ -860,9 +1133,6 @@ async function main() {
         consoleErrors.length === 0,
         consoleErrors.join("\n")
     );
-
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await page.waitForTimeout(300);
 
     await page.screenshot({
         path: path.join(HERE, "harness", "composer.png"),

@@ -24,7 +24,7 @@ const FORM_NODE_ID = "21d415924e0e4841";
 function main() {
     const exportPath =
         process.argv[2] ||
-        path.join(ROOT, "build", "aXet.SAP__Code_Agents_v4.7.0_export.deptapp");
+        path.join(ROOT, "build", "aXet.SAP__Code_Agents_v5.0.0_export.deptapp");
 
     const data = JSON.parse(fs.readFileSync(exportPath, "utf8"));
     const flows = data.flowsData.flows;
@@ -49,7 +49,18 @@ function main() {
 
     const budgetHtml = findNested(components, "promptBudget").content;
 
-    const page = renderPage({ css, controller, headerHtml, surfaceHtml, budgetHtml });
+    const sidebarHeaderHtml = findNested(components, "sidebarHeaderHtml");
+    const trayHostHtml = findNested(components, "attachmentTrayHost");
+
+    const page = renderPage({
+        css,
+        controller,
+        headerHtml,
+        surfaceHtml,
+        budgetHtml,
+        sidebarHeaderHtml: sidebarHeaderHtml ? sidebarHeaderHtml.content : "",
+        trayHostHtml: trayHostHtml ? trayHostHtml.content : ""
+    });
 
     fs.writeFileSync(path.join(HERE, "index.html"), page, "utf8");
 
@@ -80,7 +91,15 @@ function findNested(components, key) {
     return null;
 }
 
-function renderPage({ css, controller, headerHtml, surfaceHtml, budgetHtml }) {
+function renderPage({
+    css,
+    controller,
+    headerHtml,
+    surfaceHtml,
+    budgetHtml,
+    sidebarHeaderHtml,
+    trayHostHtml
+}) {
     return `<!doctype html>
 <html lang="en">
 <head>
@@ -108,6 +127,30 @@ ${css}
 </header>
 
 <div class="formio-form">
+
+  <!--
+    Sidebar panel. Best-effort reproduction of what a Form.io "container"
+    holding an htmlelement plus a "datagrid" is believed to render -- the
+    outer wrapper classes (.formio-component-container,
+    .formio-component-sidebarPanel) are the part actually load-bearing
+    for the CSS in history.css; the inner datagrid markup below is a
+    plausible approximation, not a verified one (Form.io itself is not
+    available in this harness). See docs/CHAT-HISTORY.md.
+  -->
+  <div class="formio-component formio-component-container formio-component-sidebarPanel sca-sidebar-panel">
+    <div class="formio-component formio-component-htmlelement">
+      <div class="sca-sidebar-header-host">
+${sidebarHeaderHtml}
+      </div>
+    </div>
+
+    <div class="formio-component formio-component-datagrid formio-component-conversationsGrid">
+      <table>
+        <thead><tr><th>Title</th><th>Updated</th><th>Open</th><th>Delete</th></tr></thead>
+        <tbody id="sca-harness-conversations-body"></tbody>
+      </table>
+    </div>
+  </div>
 
   <!--
     Form.io renders an htmlelement as <div class="{className}">, so the
@@ -144,6 +187,32 @@ ${surfaceHtml}
 ${budgetHtml}
     </div>
 
+    <!--
+      Best-effort reproduction of Form.io's default "file" component
+      template (ref="fileDrop"/"fileBrowse", an underlying real
+      <input type="file">). This is the ONE shape in this harness with
+      no directly observed precedent -- see docs/CHAT-HISTORY.md -- but
+      the underlying <input type="file"> and its native change event
+      are standard HTML regardless of the exact wrapper markup around
+      them, which is what SCA-37's delegated listener actually depends
+      on.
+    -->
+    <div class="formio-component formio-component-container formio-component-attachmentBar sca-attachment-bar-host">
+      <div class="formio-component formio-component-file formio-component-attachmentPicker">
+        <div class="fileSelector" ref="fileDrop">
+          <i class="fa fa-cloud-upload"></i>
+          <span>Drop files to attach, or</span>
+          <a href="#" ref="fileBrowse">browse</a>
+          <input type="file" multiple accept=".docx,.pdf,.txt,.md,.markdown" style="opacity:0;position:absolute;inset:0;">
+        </div>
+        <ul ref="fileList" class="list-group"></ul>
+      </div>
+
+      <div class="formio-component formio-component-htmlelement">
+${trayHostHtml}
+      </div>
+    </div>
+
     <div class="formio-component formio-component-textarea formio-component-userMessage">
       <div class="form-group">
         <textarea name="data[composer][userMessage]"
@@ -162,6 +231,15 @@ ${budgetHtml}
 
   <div class="formio-component formio-component-button formio-component-downloadResponse sca-download-submit">
     <button type="button" name="data[downloadResponse]">Download</button>
+  </div>
+
+  <!--
+    CSS-hidden (history.css 26F), not Form.io hidden:true — a real,
+    clickable button ScaHistory.refreshConversationList() finds and
+    clicks, matching the technique already used for messagesJson etc.
+  -->
+  <div class="formio-component formio-component-button formio-component-loadConversations">
+    <button type="button" name="data[loadConversations]">Load Conversations</button>
   </div>
 
   <div class="formio-component formio-component-htmlelement">
@@ -235,6 +313,57 @@ ${budgetHtml}
 
     window.__harnessData = submissionData;
     window.data = submissionData;
+
+    /*
+     * Minimal reproduction of Form.io re-rendering a datagrid from a
+     * bound array — enough to test this project's OWN CSS and the one
+     * behaviour (closing the sidebar after a row is opened, on narrow
+     * screens) that depends on the row buttons' class names. It is not
+     * a claim about how Form.io itself renders a datagrid.
+     */
+    window.__harnessRenderConversations = function (rows) {
+        submissionData.conversationsGrid = rows;
+
+        var body = document.getElementById("sca-harness-conversations-body");
+
+        body.innerHTML = "";
+
+        rows.forEach(function (row, index) {
+            var tr = document.createElement("tr");
+
+            tr.innerHTML =
+                '<td class="formio-component formio-component-title">' +
+                row.title +
+                '</td><td class="formio-component formio-component-updatedAtLabel">' +
+                row.updatedAtLabel +
+                '</td><td class="formio-component formio-component-open">' +
+                '<button type="button">open</button></td>' +
+                '<td class="formio-component formio-component-delete">' +
+                '<button type="button">delete</button></td>';
+
+            tr.querySelector(".formio-component-open button").addEventListener(
+                "click",
+                function () {
+                    submissionData.conversationsGrid.forEach(function (r) {
+                        r.open = false;
+                    });
+                    submissionData.conversationsGrid[index].open = true;
+                }
+            );
+
+            tr.querySelector(".formio-component-delete button").addEventListener(
+                "click",
+                function () {
+                    submissionData.conversationsGrid.forEach(function (r) {
+                        r["delete"] = false;
+                    });
+                    submissionData.conversationsGrid[index]["delete"] = true;
+                }
+            );
+
+            body.appendChild(tr);
+        });
+    };
 })();
 </script>
 

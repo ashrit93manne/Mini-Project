@@ -6,3 +6,4 @@ code-companion/node_modules/
 code-companion/tests/harness/index.html
 code-companion/tests/harness/scratch/
 code-companion/tests/harness/*.png
+code-companion/tools/__pycache__/

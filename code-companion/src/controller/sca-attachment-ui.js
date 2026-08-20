@@ -1,52 +1,64 @@
 /*
  * Code Companion — Attachment UI
  *
- * Version 1.0.0
+ * Version 2.0.0
  *
- * Owns the composer's paperclip control, the attached-file tray, and the
- * plumbing that carries extracted text into the Form.io submission.
+ * Owns the attached-file tray and the plumbing that carries extracted
+ * text into the Form.io submission.
  *
- * Mounting strategy
- * -----------------
- * The paperclip, the tray and the file input are built here in script
- * rather than declared as Form.io components, and re-mounted whenever
- * they go missing. Form.io re-renders the form on almost every state
- * change and sanitises HTML element content, so a declarative <input
- * type="file"> is liable to be stripped or destroyed mid-conversation.
- * The two hidden fields that carry data to the backend ARE declared
- * components, because only declared components appear in the submission.
+ * Why this is v2 (read before changing the mounting strategy again)
+ * -------------------------------------------------------------------
+ * v1 built the file-picker trigger — a <button> plus a synthesized
+ * <input type="file"> — entirely in script and appended it into the DOM
+ * via querySelector + appendChild. It worked in every harness tested
+ * against, including a browser loading the exact built export, and it
+ * did not appear at all in the real deployment. The one thing that DID
+ * keep working there was the hamburger removal (SCA-36), which proved
+ * the script executes fine; the difference is that SCA-36 only ever
+ * TAGS elements the platform already rendered, while v1's file picker
+ * MANUFACTURED new elements and positioned them with CSS calc() against
+ * assumptions about the composer's exact real DOM. One of those
+ * assumptions didn't hold, and the result was silent — nothing to click,
+ * nothing visibly broken either.
  *
- * Placement
- * ---------
- * The paperclip sits inside the left edge of the message box, opposite
- * the send button. That is the convention every current assistant UI
- * uses, and it reads correctly: the control belongs to the message being
- * composed, not to the page. Putting it in the header would have
- * detached it from the message it modifies; putting it beside Send would
- * have crowded the primary action and invited mis-clicks.
+ * v2 removes that entire class of risk for the picker itself: the file
+ * input is now a DECLARED Form.io `file` component (key: attachmentPicker,
+ * added in build_deptapp.py), rendered by Form.io the same way the send
+ * button, the message textarea and every other proven-working control on
+ * this screen are rendered. This script never creates it and never
+ * positions it by calculation — it only listens for a native `change`
+ * event bubbling up from the real <input type="file"> that component
+ * contains, exactly the way SCA-24's click handling already listens for
+ * clicks on the Send button. That delegation pattern is known to work in
+ * production, because Send and New Chat already depend on it.
+ *
+ * The attachment tray (the chip list) still needs a place to render
+ * rich, changing content — spinners, character counts, remove buttons —
+ * that a plain Form.io field can't express. For that this script keeps
+ * doing what the base controller has always done for the chat log and
+ * the header: write innerHTML into a DECLARED `htmlelement` component
+ * (key: attachmentTrayHost). The container's existence is guaranteed by
+ * Form.io; only what fills it is script-owned, matching #sca-chat-log
+ * exactly.
+ *
+ * If a chip's "remove" affordance or the counter beside the prompt
+ * budget doesn't render pixel-perfect on some unforeseen layout, the
+ * degraded form is still a working, if plainer, Form.io file field —
+ * never nothing.
  */
 
 var ScaAttachmentUi = (function buildScaAttachmentUi() {
     "use strict";
 
-    var UI_VERSION = "1.0.0";
+    var UI_VERSION = "2.0.0";
 
     var SELECTORS = {
-        composer: ".formio-component-composer, .sca-composer",
-        bar: "#sca-attachment-bar",
-        tray: "#sca-attachment-tray",
-        button: "#sca-attach-button",
-        input: "#sca-attach-input",
+        pickerRoot: ".formio-component-attachmentPicker",
+        pickerInput: '.formio-component-attachmentPicker input[type="file"]',
+        trayHost: "#sca-attachment-tray",
         budgetHost: "#sca-prompt-budget",
         attachmentCounter: "#sca-attachment-counter"
     };
-
-    var PAPERCLIP_ICON =
-        '<svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true" focusable="false">' +
-        '<path fill="none" stroke="currentColor" stroke-width="1.9" ' +
-        'stroke-linecap="round" stroke-linejoin="round" ' +
-        'd="M21.44 11.05l-8.49 8.49a5.5 5.5 0 0 1-7.78-7.78l8.49-8.49a3.67 3.67 0 1 1 5.19 5.19l-8.5 8.49a1.83 1.83 0 0 1-2.6-2.6l7.85-7.84"/>' +
-        "</svg>";
 
     var SPINNER_ICON =
         '<span class="sca-chip-spinner" aria-hidden="true"></span>';
@@ -57,8 +69,12 @@ var ScaAttachmentUi = (function buildScaAttachmentUi() {
     var state = {
         records: [],
         busy: 0,
-        mounted: false,
-        notice: ""
+        notice: "",
+        /*
+         * Guards against attaching the delegated change listener more
+         * than once across repeated mount() calls.
+         */
+        listenerAttached: false
     };
 
     /* =========================================================
@@ -78,6 +94,10 @@ var ScaAttachmentUi = (function buildScaAttachmentUi() {
 
     /* =========================================================
      * AUI-02 — MOUNTING
+     *
+     * "Mounting" here means: find the components Form.io already
+     * rendered, and make sure our one delegated listener is attached.
+     * Nothing is created.
      * ========================================================= */
 
     function find(selector) {
@@ -89,89 +109,134 @@ var ScaAttachmentUi = (function buildScaAttachmentUi() {
     }
 
     function mount() {
-        var composer = find(SELECTORS.composer);
+        var pickerRoot = find(SELECTORS.pickerRoot);
+        var trayHost = find(SELECTORS.trayHost);
 
-        if (!composer) {
-            return false;
-        }
-
-        if (find(SELECTORS.bar)) {
-            state.mounted = true;
-            return true;
-        }
-
-        var bar = document.createElement("div");
-
-        bar.id = "sca-attachment-bar";
-        bar.className = "sca-attachment-bar";
-
-        var tray = document.createElement("div");
-
-        tray.id = "sca-attachment-tray";
-        tray.className = "sca-attachment-tray";
-        tray.setAttribute("role", "list");
-        tray.setAttribute("aria-label", "Attached files");
-
-        var button = document.createElement("button");
-
-        button.id = "sca-attach-button";
-        button.type = "button";
-        button.className = "sca-attach-button";
-        button.innerHTML = PAPERCLIP_ICON;
-
-        button.setAttribute("aria-label", attachButtonLabel());
-        button.setAttribute("title", attachButtonLabel());
-
-        var input = document.createElement("input");
-
-        input.id = "sca-attach-input";
-        input.className = "sca-attach-input";
-        input.type = "file";
-        input.multiple = true;
-        input.tabIndex = -1;
-        input.setAttribute("aria-hidden", "true");
-        input.accept = engine.manager.acceptAttribute();
-
-        input.addEventListener("change", function () {
-            var files = Array.prototype.slice.call(input.files || []);
-
-            /*
-             * Resetting the value here means selecting the same file
-             * twice in a row still fires a change event.
-             */
-            input.value = "";
-
-            if (files.length) {
-                addFiles(files);
-            }
-        });
-
-        bar.appendChild(tray);
-        bar.appendChild(button);
-        bar.appendChild(input);
-
-        composer.appendChild(bar);
-
+        attachChangeListener();
         mountCounter();
 
-        state.mounted = true;
-
-        log("info", "attachment-bar-mounted", { version: UI_VERSION });
+        if (pickerRoot) {
+            decoratePicker(pickerRoot);
+        }
 
         renderTray();
 
-        return true;
+        return Boolean(pickerRoot) && Boolean(trayHost);
     }
 
-    function attachButtonLabel() {
-        return (
+    /*
+     * Attached once, to `document`, and never removed for the life of
+     * the page — the same lifetime as SCA-31's click/keydown listeners.
+     * Delegation means it keeps working across every Form.io re-render
+     * without needing to be re-attached to a fresh element each time.
+     */
+    function attachChangeListener() {
+        if (state.listenerAttached) {
+            return;
+        }
+
+        document.addEventListener(
+            "change",
+            function (event) {
+                var input =
+                    event.target instanceof Element
+                        ? event.target.closest(SELECTORS.pickerInput)
+                        : null;
+
+                if (!input) {
+                    return;
+                }
+
+                var files = Array.prototype.slice.call(input.files || []);
+
+                if (files.length) {
+                    addFiles(files);
+                }
+
+                /*
+                 * Form.io owns this input's value; clearing it here would
+                 * fight its own state management. Duplicate detection in
+                 * addFiles() is what makes re-picking the same file safe,
+                 * not clearing the input.
+                 */
+            },
+            true
+        );
+
+        state.listenerAttached = true;
+
+        log("info", "change-listener-attached", { version: UI_VERSION });
+    }
+
+    /*
+     * Form.io's default file component renders a full drop-zone with
+     * instructional text ("Drop files to attach, or Browse"), which is
+     * correct but visually heavy for a composer toolbar. This trims the
+     * wording to something compact WITHOUT touching how the element
+     * works — it only rewrites text content Form.io already rendered,
+     * the same low-risk category of change as SCA-36's tagging.
+     *
+     * Guarded so it only runs once per real DOM node (Form.io may
+     * re-render this component on state changes, producing a fresh
+     * node each time, which naturally re-triggers the trim).
+     */
+    function decoratePicker(pickerRoot) {
+        if (pickerRoot.getAttribute("data-sca-decorated") === "true") {
+            return;
+        }
+
+        var browseLink = pickerRoot.querySelector(
+            'a[ref="fileBrowse"], .fileSelector a, .browse'
+        );
+
+        var dropZone = pickerRoot.querySelector(
+            '[ref="fileDrop"], .fileSelector'
+        );
+
+        if (browseLink) {
+            browseLink.textContent = "Attach files";
+        }
+
+        if (dropZone && !browseLink) {
+            /*
+             * Some Form.io templates fold the browse trigger and the
+             * drop-zone label into one text node rather than a separate
+             * <a>. Falling back to relabelling the whole zone keeps this
+             * useful even if that's the shape encountered here.
+             */
+            var existingLink = dropZone.querySelector("a");
+
+            if (existingLink) {
+                existingLink.textContent = "Attach files";
+            }
+        }
+
+        /*
+         * Hide Form.io's own post-selection file list: the richer chip
+         * tray below is the single source of truth for what's attached,
+         * so showing both would be redundant and could drift out of
+         * sync (e.g. Form.io shows a file our own extraction rejected).
+         */
+        var nativeList = pickerRoot.querySelector(
+            '[ref="fileList"], ul.list-group'
+        );
+
+        if (nativeList) {
+            nativeList.classList.add("sca-native-file-list-hidden");
+        }
+
+        pickerRoot.setAttribute("data-sca-decorated", "true");
+        pickerRoot.setAttribute(
+            "title",
             "Attach a file (" +
-            engine.manager
-                .supportedExtensionList()
-                .join(", ")
-                .toUpperCase()
-                .replace(/\./g, "") +
-            ")"
+                (engine
+                    ? engine.manager
+                          .supportedExtensionList()
+                          .join(", ")
+                          .toUpperCase()
+                          .replace(/\./g, "")
+                    : "DOCX, PDF, TXT, MD") +
+                ")"
         );
     }
 
@@ -222,6 +287,11 @@ var ScaAttachmentUi = (function buildScaAttachmentUi() {
 
     /* =========================================================
      * AUI-03 — FILE INTAKE
+     *
+     * Unchanged from v1 below this point: everything from here to the
+     * end of AUI-06 operates on the raw File objects handed to it by
+     * attachChangeListener() and has no dependency on how those files
+     * were picked.
      * ========================================================= */
 
     function addFiles(files) {
@@ -232,6 +302,8 @@ var ScaAttachmentUi = (function buildScaAttachmentUi() {
             setNotice(
                 "You can attach up to " + limits.MAX_FILES + " files per message."
             );
+
+            renderTray();
 
             return;
         }
@@ -419,7 +491,7 @@ var ScaAttachmentUi = (function buildScaAttachmentUi() {
      * ========================================================= */
 
     function renderTray() {
-        var tray = find(SELECTORS.tray);
+        var tray = find(SELECTORS.trayHost);
 
         if (!tray) {
             return;
@@ -603,26 +675,22 @@ var ScaAttachmentUi = (function buildScaAttachmentUi() {
      * ========================================================= */
 
     function refreshComposer() {
-        var button = find(SELECTORS.button);
+        var pickerRoot = find(SELECTORS.pickerRoot);
 
-        if (button) {
+        if (pickerRoot) {
             var atFileLimit =
                 state.records.length >= engine.manager.LIMITS.MAX_FILES;
 
             var blocked = isProcessing() || atFileLimit;
 
-            button.disabled = blocked;
-            button.setAttribute("aria-disabled", blocked ? "true" : "false");
-            button.classList.toggle("is-busy", state.busy > 0);
+            pickerRoot.classList.toggle("sca-picker-disabled", blocked);
+            pickerRoot.setAttribute("aria-disabled", blocked ? "true" : "false");
 
-            button.setAttribute(
-                "title",
-                atFileLimit
-                    ? "Maximum of " +
-                          engine.manager.LIMITS.MAX_FILES +
-                          " files per message"
-                    : attachButtonLabel()
-            );
+            var input = pickerRoot.querySelector('input[type="file"]');
+
+            if (input) {
+                input.disabled = blocked;
+            }
         }
 
         if (controller && typeof controller.updateSendAvailability === "function") {
@@ -740,6 +808,10 @@ var ScaAttachmentUi = (function buildScaAttachmentUi() {
      *
      * Returns true when the event was an attachment interaction, so the
      * host controller's click handler can stop processing it.
+     *
+     * The picker button itself is no longer handled here: it is a real
+     * <a>/<input> Form.io renders and manages, so clicking it needs no
+     * help from this controller at all.
      * ========================================================= */
 
     function handleClick(event) {
@@ -757,25 +829,6 @@ var ScaAttachmentUi = (function buildScaAttachmentUi() {
             event.stopPropagation();
 
             removeRecord(remove.getAttribute("data-attachment-remove"));
-
-            return true;
-        }
-
-        var button = target.closest(SELECTORS.button);
-
-        if (button) {
-            event.preventDefault();
-            event.stopPropagation();
-
-            if (button.disabled) {
-                return true;
-            }
-
-            var input = find(SELECTORS.input);
-
-            if (input) {
-                input.click();
-            }
 
             return true;
         }
@@ -801,13 +854,7 @@ var ScaAttachmentUi = (function buildScaAttachmentUi() {
             return;
         }
 
-        if (!find(SELECTORS.bar)) {
-            /* Form.io re-rendered the composer; put the control back. */
-            state.mounted = false;
-            mount();
-        }
-
-        mountCounter();
+        mount();
         refreshComposer();
     }
 
