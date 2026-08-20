@@ -1,0 +1,149 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:'Segoe UI',Calibri,system-ui,sans-serif;background:#eef1f7;color:#0a1f44}
+a{color:#003087}a:hover{color:#002368}
+.app{display:flex;width:1440px;height:900px;background:#f4f6fb;overflow:hidden}
+.nav{width:64px;background:#001b4d;display:flex;flex-direction:column;align-items:center;gap:4px;padding:14px 0}
+.mark{width:36px;height:36px;border-radius:9px;background:#00b4d8;color:#001b4d;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;margin-bottom:10px}
+.navi{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#8ea6d8}
+.navi.on{background:rgba(255,255,255,.14);color:#fff}
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.hdr{height:56px;background:#003087;display:flex;align-items:center;gap:12px;padding:0 20px;color:#fff;flex-shrink:0}
+.crumb{font-size:12px;color:rgba(255,255,255,.6)}
+.dtitle{font-size:14px;font-weight:600;color:#fff}
+.spacer{flex:1}
+.ava{width:30px;height:30px;border-radius:50%;background:#00b4d8;color:#00284d;font-size:11.5px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.rail{background:#fff;border-bottom:1px solid #e2e8f0;padding:14px 24px 0;flex-shrink:0}
+.stops{display:flex;align-items:flex-start}
+.stop{display:flex;flex-direction:column;align-items:center;gap:4px;width:118px;flex-shrink:0}
+.disc{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;border:2px solid #cbd5e1;color:#94a3b8;background:#fff}
+.stop.done .disc{background:#00b4d8;border-color:#00b4d8;color:#fff}
+.stop.now .disc{background:#003087;border-color:#003087;color:#fff;box-shadow:0 0 0 4px rgba(0,48,135,.13)}
+.slab{font-size:12px;font-weight:600;color:#a0aec0}
+.stop.done .slab{color:#475569}
+.stop.now .slab{color:#003087}
+.ssub{font-size:10px;color:#b6c0cf}
+.stop.now .ssub{color:#5a7cc0}
+.link{flex:1;height:2px;background:#e6ebf3;margin-top:13px}
+.link.done{background:#00b4d8}
+.meter{height:3px;background:#eef1f7;margin:14px -24px 0}
+.meter i{display:block;height:3px;background:linear-gradient(90deg,#003087,#00b4d8)}
+.body{flex:1;overflow:hidden;display:flex;justify-content:center;padding:38px 32px}
+.col{width:760px;display:flex;flex-direction:column;gap:18px}
+.hero{background:linear-gradient(135deg,#f4fbf7,#fff);border:1px solid #cbeddb;border-radius:14px;padding:26px 28px;display:flex;gap:18px;align-items:flex-start}
+.tickbig{width:46px;height:46px;border-radius:50%;background:#dcfce7;color:#047857;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.h1{font-size:21px;font-weight:700;margin:0 0 4px;color:#0a1f44}
+.sub{font-size:13.5px;color:#547065;margin:0;line-height:1.55}
+.card{background:#fff;border:1px solid #e6ebf3;border-radius:12px;padding:18px 20px;box-shadow:0 1px 3px rgba(10,31,68,.05)}
+.fname{font-size:15px;font-weight:700;color:#0a1f44}
+.fmeta{font-size:12px;color:#8a97ab;margin-top:3px}
+.btn{height:38px;border-radius:8px;padding:0 16px;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:8px;border:1px solid #d5deec;background:#fff;color:#003087}
+.btn.pri{background:#003087;border-color:#003087;color:#fff;box-shadow:0 2px 8px rgba(0,48,135,.22)}
+.btn.ghost{border-color:transparent;background:transparent;color:#64748b}
+.eyebrow{font-size:10.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#8a97ab}
+.li{display:flex;align-items:center;gap:9px;font-size:12.5px;color:#3d4a60}
+.dotb{width:6px;height:6px;border-radius:50%;background:#00b4d8;flex-shrink:0}
+.warnbox{background:#fffdf5;border:1px solid #f0e2bd;border-radius:11px;padding:13px 15px;display:flex;gap:10px}
+</style>
+</helmet>
+
+<div class="app">
+  <aside class="nav">
+    <div class="mark">TD</div>
+    <div class="navi"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
+    <div class="navi on"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg></div>
+    <div class="navi"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg></div>
+    <div class="spacer"></div>
+    <div class="navi"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg></div>
+  </aside>
+
+  <div class="main">
+    <header class="hdr">
+      <span class="crumb">Technical Designs /</span>
+      <span class="dtitle">Vendor Ageing Report – FI</span>
+      <span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:rgba(0,180,216,.22);color:#bdf0ff">v1.0</span>
+      <div class="spacer"></div>
+      <div class="ava">AM</div>
+    </header>
+
+    <div class="rail">
+      <div class="stops">
+        <div class="stop done"><div class="disc"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></div><div class="slab">Source</div><div class="ssub">FS uploaded</div></div>
+        <div class="link done"></div>
+        <div class="stop done"><div class="disc"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></div><div class="slab">Scope</div><div class="ssub">10 sections</div></div>
+        <div class="link done"></div>
+        <div class="stop done"><div class="disc"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></div><div class="slab">Generate</div><div class="ssub">Draft ready</div></div>
+        <div class="link done"></div>
+        <div class="stop done"><div class="disc"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></div><div class="slab">Review</div><div class="ssub">10 of 10 confirmed</div></div>
+        <div class="link done"></div>
+        <div class="stop now"><div class="disc">5</div><div class="slab">Deliver</div><div class="ssub">Word document</div></div>
+      </div>
+      <div class="meter"><i style="width:100%"></i></div>
+    </div>
+
+    <div class="body">
+      <div class="col">
+        <div class="hero">
+          <div class="tickbig"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+          <div>
+            <h1 class="h1">Technical design ready</h1>
+            <p class="sub">All 10 sections confirmed by you. The document is written into the standard TD template, with the FS clause references kept in the margin notes.</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div style="display:flex;align-items:center;gap:15px">
+            <div style="width:46px;height:46px;border-radius:10px;background:#eef4ff;color:#003087;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5"/></svg>
+            </div>
+            <div style="flex:1;min-width:0">
+              <div class="fname">TD_VendorAgeingReport_FI_v1.0.docx</div>
+              <div class="fmeta">24 pages · 486 KB · generated 20 Aug 2026, 14:41</div>
+            </div>
+            <div class="btn pri"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 4v11m0 0l-4-4m4 4l4-4"/><path d="M5 19h14"/></svg>Download Word</div>
+          </div>
+
+          <div style="height:1px;background:#f1f4f9;margin:17px -20px"></div>
+
+          <div class="eyebrow" style="margin-bottom:11px">What is inside</div>
+          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px 24px">
+            <div class="li"><span class="dotb"></span>10 confirmed sections</div>
+            <div class="li"><span class="dotb"></span>2 diagrams rendered into the document</div>
+            <div class="li"><span class="dotb"></span>5 development objects listed</div>
+            <div class="li"><span class="dotb"></span>14 traceability references to the FS</div>
+            <div class="li"><span class="dotb"></span>8 test scenarios, 3 negative paths</div>
+            <div class="li"><span class="dotb"></span>Enhancement checks noted for the ABAP team</div>
+          </div>
+        </div>
+
+        <div class="warnbox">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#b45309" stroke-width="1.8" stroke-linecap="round" style="flex-shrink:0;margin-top:1px"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L2.5 18a2 2 0 001.7 3h15.6a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>
+          <div style="font-size:12.5px;color:#7c4a08;line-height:1.55">
+            <strong style="color:#5c3506">1 open question travels with the document.</strong> Currency conversion for cross-company-code totals was left unanswered and is recorded in section 3 for the reviewer, not guessed.
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="btn ghost">← Back to review</div>
+          <div class="spacer"></div>
+          <div class="btn">Download PDF</div>
+          <div class="btn">Start a new design</div>
+        </div>
+
+        <div style="text-align:center;font-size:11.5px;color:#a0aec0">Saved to My designs as v1.0 · a new version is created each time you regenerate and download</div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

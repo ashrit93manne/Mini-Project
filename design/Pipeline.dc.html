@@ -1,0 +1,110 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:'Segoe UI',Calibri,system-ui,sans-serif;background:#fff;color:#0a1f44}
+a{color:#003087}a:hover{color:#002368}
+.sheet{width:1000px;height:820px;padding:30px 34px;background:#fff;display:flex;flex-direction:column;gap:18px}
+.h1{font-size:21px;font-weight:700;margin:0 0 4px}
+.sub{font-size:13px;color:#64748b;margin:0;line-height:1.55;max-width:760px}
+.eyebrow{font-size:10.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#8a97ab}
+.cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.card{border:1px solid #e6ebf3;border-radius:12px;padding:15px 17px;background:#fbfcfe}
+.ct{font-size:13.5px;font-weight:700;color:#0a1f44;margin:0 0 6px}
+.cb{font-size:12.5px;line-height:1.6;color:#4a5568;margin:0}
+.mono{font-family:'Cascadia Mono',Consolas,monospace;font-size:11.5px;color:#003087;background:#eef4ff;border-radius:4px;padding:1px 5px}
+</style>
+</helmet>
+
+<div class="sheet">
+  <div>
+    <h1 class="h1">How the technical design becomes a document</h1>
+    <p class="sub">The deliverable is a Word file rendered from confirmed JSON — the same mechanism the FS agent already runs in production, with diagrams as the one place images are generated.</p>
+  </div>
+
+  <svg width="930" height="520" viewBox="0 0 930 520" fill="none" style="max-width:100%">
+    <defs>
+      <marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+        <path d="M0 1l5 3-5 3z" fill="#8fa2c0"/>
+      </marker>
+      <marker id="arl" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+        <path d="M0 1l5 3-5 3z" fill="#00b4d8"/>
+      </marker>
+    </defs>
+
+    <!-- 1 -->
+    <rect x="40" y="20" width="340" height="56" rx="10" fill="#eef4ff" stroke="#003087" stroke-width="1.5"/>
+    <text x="60" y="43" font-size="13" font-weight="700" fill="#003087">React SPA · the consultant's browser</text>
+    <text x="60" y="61" font-size="11.5" fill="#5a7cc0">Upload FS · confirm scope · review · download</text>
+    <path d="M210 76v14" stroke="#8fa2c0" stroke-width="1.5" marker-end="url(#ar)"/>
+
+    <!-- 2 -->
+    <rect x="40" y="92" width="340" height="56" rx="10" fill="#f7f9fc" stroke="#d5deec" stroke-width="1.5"/>
+    <text x="60" y="115" font-size="13" font-weight="700" fill="#0a1f44">http-in / http-response nodes</text>
+    <text x="60" y="133" font-size="11.5" fill="#64748b">REST endpoints on aXet.flows, Okta session cookie</text>
+    <path d="M210 148v14" stroke="#8fa2c0" stroke-width="1.5" marker-end="url(#ar)"/>
+    <path d="M380 120h26" stroke="#c7d2e3" stroke-width="1.2" stroke-dasharray="3 3"/>
+    <text x="414" y="117" font-size="11" fill="#8a97ab">One endpoint per action —</text>
+    <text x="414" y="131" font-size="11" fill="#8a97ab">upload, scope, generate, confirm, render</text>
+
+    <!-- 3 -->
+    <rect x="40" y="164" width="340" height="56" rx="10" fill="#f7f9fc" stroke="#d5deec" stroke-width="1.5"/>
+    <text x="60" y="187" font-size="13" font-weight="700" fill="#0a1f44">Session controller + noSQL store</text>
+    <text x="60" y="205" font-size="11.5" fill="#64748b">One session document per design, survives reload</text>
+    <path d="M210 220v14" stroke="#8fa2c0" stroke-width="1.5" marker-end="url(#ar)"/>
+
+    <!-- 4 -->
+    <rect x="40" y="236" width="340" height="56" rx="10" fill="#eef4ff" stroke="#003087" stroke-width="1.5"/>
+    <text x="60" y="259" font-size="13" font-weight="700" fill="#003087">LLM Enabler node</text>
+    <text x="60" y="277" font-size="11.5" fill="#5a7cc0">One call per section · strict JSON out, no prose wrapper</text>
+    <path d="M210 292v14" stroke="#8fa2c0" stroke-width="1.5" marker-end="url(#ar)"/>
+    <path d="M384 264h172" stroke="#00b4d8" stroke-width="1.5" marker-end="url(#arl)"/>
+
+    <!-- 5 -->
+    <rect x="40" y="308" width="340" height="56" rx="10" fill="#f7f9fc" stroke="#d5deec" stroke-width="1.5"/>
+    <text x="60" y="331" font-size="13" font-weight="700" fill="#0a1f44">Schema validation and repair</text>
+    <text x="60" y="349" font-size="11.5" fill="#64748b">Every field present · tables as arrays · one retry on bad JSON</text>
+    <path d="M210 364v14" stroke="#8fa2c0" stroke-width="1.5" marker-end="url(#ar)"/>
+
+    <!-- 6 -->
+    <rect x="40" y="380" width="340" height="56" rx="10" fill="#f0fdf4" stroke="#4ade80" stroke-width="1.5"/>
+    <text x="60" y="403" font-size="13" font-weight="700" fill="#065f46">docxtemplater + PizZip</text>
+    <text x="60" y="421" font-size="11.5" fill="#047857">Corporate TD template filled, returned as base64</text>
+    <path d="M210 436v14" stroke="#8fa2c0" stroke-width="1.5" marker-end="url(#ar)"/>
+
+    <!-- 7 -->
+    <rect x="40" y="452" width="340" height="52" rx="10" fill="#fff" stroke="#d5deec" stroke-width="1.5"/>
+    <text x="60" y="475" font-size="13" font-weight="700" fill="#0a1f44">Download · TD_&lt;object&gt;_v1.0.docx</text>
+    <text x="60" y="492" font-size="11.5" fill="#64748b">Version kept on the session for re-download</text>
+
+    <!-- diagram branch -->
+    <rect x="556" y="236" width="334" height="104" rx="10" fill="#fff" stroke="#00b4d8" stroke-width="1.5" stroke-dasharray="5 4"/>
+    <text x="576" y="260" font-size="12.5" font-weight="700" fill="#0369a1">The one place images are generated</text>
+    <text x="576" y="281" font-size="11.5" fill="#4a5568">1 · LLM writes Mermaid source for the diagram</text>
+    <text x="576" y="299" font-size="11.5" fill="#4a5568">2 · SPA renders it to SVG, consultant approves it</text>
+    <text x="576" y="317" font-size="11.5" fill="#4a5568">3 · SVG converted to PNG, sent back with the JSON</text>
+    <path d="M723 340v66q0 6-6 6H390" stroke="#00b4d8" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arl)"/>
+    <text x="576" y="430" font-size="11" fill="#0369a1">Embedded by the docxtemplater image module</text>
+  </svg>
+
+  <div class="cards">
+    <div class="card">
+      <p class="ct">Why a document generator, not image generation</p>
+      <p class="cb">A technical design is a working artefact, not a picture of one. The ABAP team copies object names out of it, QA lifts the test scenarios, the reviewer tracks changes and comments in the margin, and it goes into project document control with a version history. Rendering the corporate <span class="mono">.docx</span> template means the output is indistinguishable from a hand-written TD — same headers, same numbering, same fonts.</p>
+    </div>
+    <div class="card">
+      <p class="ct">What the consultant can still change</p>
+      <p class="cb">Everything the document contains is confirmed JSON on the session, so a regenerated section, an edited table or a replaced diagram simply re-renders the file. The template itself stays under the delivery team's control — swapping in a client's own TD template is a template upload, not a code change.</p>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

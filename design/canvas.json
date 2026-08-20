@@ -1,0 +1,35 @@
+{
+  "pages": [
+    { "id": "page-1", "name": "Screens" },
+    { "id": "page-2", "name": "Rail & delivery" }
+  ],
+  "artboards": [
+    { "file": "Dashboard.dc.html", "title": "Home — My designs", "page": "page-1", "x": 0, "y": 0, "w": 1440, "h": 900 },
+    { "file": "Source.dc.html", "title": "Step 1 — Source", "page": "page-1", "x": 1560, "y": 0, "w": 1440, "h": 900 },
+    { "file": "Scope.dc.html", "title": "Step 2 — Scope & context", "page": "page-1", "x": 3120, "y": 0, "w": 1440, "h": 900 },
+    { "file": "Generate.dc.html", "title": "Step 3 — Generate", "page": "page-1", "x": 0, "y": 1060, "w": 1440, "h": 900 },
+    { "file": "Main.dc.html", "title": "Step 4 — Review & refine", "page": "page-1", "x": 1560, "y": 1060, "w": 1440, "h": 900 },
+    { "file": "Deliver.dc.html", "title": "Step 5 — Deliver", "page": "page-1", "x": 3120, "y": 1060, "w": 1440, "h": 900 },
+    { "file": "WorkflowRail.dc.html", "title": "Workflow rail — states & rules", "page": "page-2", "x": 0, "y": 0, "w": 1000, "h": 820 },
+    { "file": "Pipeline.dc.html", "title": "FS to .docx — the delivery path", "page": "page-2", "x": 1120, "y": 0, "w": 1000, "h": 820 }
+  ],
+  "annotations": [
+    {
+      "id": "flow-note",
+      "page": "page-1",
+      "x": 0,
+      "y": -190,
+      "w": 620,
+      "text": "TD Generator — React SPA on axet-spa-app, aXet.flows behind it.\nTop row: entry and intake. Bottom row: the AI loop and the deliverable.\nThe blue header, the icon rail and the 5-stop workflow rail are the persistent shell — only the panel underneath changes between steps."
+    },
+    {
+      "id": "rail-note",
+      "page": "page-2",
+      "x": 0,
+      "y": -150,
+      "w": 560,
+      "text": "Two questions answered here: what the progress indicator is and how it behaves, and how the finished design reaches the consultant as a Word document."
+    }
+  ],
+  "launch": { "view": "canvas", "page": "page-1" }
+}

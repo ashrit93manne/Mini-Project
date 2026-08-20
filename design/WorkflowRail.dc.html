@@ -1,0 +1,143 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:'Segoe UI',Calibri,system-ui,sans-serif;background:#fff;color:#0a1f44}
+a{color:#003087}a:hover{color:#002368}
+.sheet{width:1000px;height:820px;padding:30px 34px;background:#fff;display:flex;flex-direction:column;gap:20px}
+.h1{font-size:21px;font-weight:700;margin:0 0 4px}
+.sub{font-size:13px;color:#64748b;margin:0;line-height:1.55;max-width:720px}
+.eyebrow{font-size:10.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#8a97ab}
+.panel{border:1px solid #e6ebf3;border-radius:12px;padding:16px 18px;background:#fbfcfe}
+.railbox{background:#fff;border:1px solid #e6ebf3;border-radius:10px;padding:13px 18px 0}
+.stops{display:flex;align-items:flex-start}
+.stop{display:flex;flex-direction:column;align-items:center;gap:4px;width:104px;flex-shrink:0}
+.disc{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700;border:2px solid #cbd5e1;color:#94a3b8;background:#fff}
+.stop.done .disc{background:#00b4d8;border-color:#00b4d8;color:#fff}
+.stop.now .disc{background:#003087;border-color:#003087;color:#fff;box-shadow:0 0 0 4px rgba(0,48,135,.13)}
+.stop.att .disc{background:#fff;border-color:#f59e0b;color:#b45309}
+.slab{font-size:11.5px;font-weight:600;color:#a0aec0}
+.stop.done .slab{color:#475569}
+.stop.now .slab{color:#003087}
+.stop.att .slab{color:#b45309}
+.link{flex:1;height:2px;background:#e6ebf3;margin-top:12px}
+.link.done{background:#00b4d8}
+.meter{height:3px;background:#eef1f7;margin:12px -18px 0}
+.meter i{display:block;height:3px;background:linear-gradient(90deg,#003087,#00b4d8)}
+.caption{font-size:11.5px;font-weight:600;color:#64748b;margin-bottom:7px}
+.states{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px}
+.st{display:flex;flex-direction:column;align-items:center;gap:7px;text-align:center}
+.sname{font-size:12px;font-weight:700;color:#0a1f44}
+.sdesc{font-size:11px;color:#7d8ba1;line-height:1.45}
+.rules{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 22px}
+.rule{display:flex;gap:9px;font-size:12.5px;color:#3d4a60;line-height:1.55}
+.rn{width:19px;height:19px;border-radius:50%;background:#eef4ff;color:#003087;font-size:10.5px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+</style>
+</helmet>
+
+<div class="sheet">
+  <div>
+    <h1 class="h1">The workflow rail</h1>
+    <p class="sub">One component, mounted once by the SPA shell and never unmounted. It is the only thing on screen that does not change between steps, so the consultant always knows where they are and what is left.</p>
+  </div>
+
+  <div class="panel">
+    <div class="eyebrow" style="margin-bottom:12px">The rail at three moments</div>
+
+    <div class="caption">Step 1 — Source · nothing generated yet</div>
+    <div class="railbox" style="margin-bottom:15px">
+      <div class="stops">
+        <div class="stop now"><div class="disc">1</div><div class="slab">Source</div></div>
+        <div class="link"></div>
+        <div class="stop"><div class="disc">2</div><div class="slab">Scope</div></div>
+        <div class="link"></div>
+        <div class="stop"><div class="disc">3</div><div class="slab">Generate</div></div>
+        <div class="link"></div>
+        <div class="stop"><div class="disc">4</div><div class="slab">Review</div></div>
+        <div class="link"></div>
+        <div class="stop"><div class="disc">5</div><div class="slab">Deliver</div></div>
+      </div>
+      <div class="meter"><i style="width:10%"></i></div>
+    </div>
+
+    <div class="caption">Step 4 — Review · the underline tracks confirmed sections, not clicks</div>
+    <div class="railbox" style="margin-bottom:15px">
+      <div class="stops">
+        <div class="stop done"><div class="disc"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></div><div class="slab">Source</div></div>
+        <div class="link done"></div>
+        <div class="stop done"><div class="disc"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></div><div class="slab">Scope</div></div>
+        <div class="link done"></div>
+        <div class="stop done"><div class="disc"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></div><div class="slab">Generate</div></div>
+        <div class="link done"></div>
+        <div class="stop now"><div class="disc">4</div><div class="slab">Review</div></div>
+        <div class="link"></div>
+        <div class="stop"><div class="disc">5</div><div class="slab">Deliver</div></div>
+      </div>
+      <div class="meter"><i style="width:74%"></i></div>
+    </div>
+
+    <div class="caption">Step 2 — Scope, held open · a stop can ask for attention without losing its place</div>
+    <div class="railbox">
+      <div class="stops">
+        <div class="stop done"><div class="disc"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></div><div class="slab">Source</div></div>
+        <div class="link done"></div>
+        <div class="stop att"><div class="disc">!</div><div class="slab">Scope</div></div>
+        <div class="link"></div>
+        <div class="stop"><div class="disc">3</div><div class="slab">Generate</div></div>
+        <div class="link"></div>
+        <div class="stop"><div class="disc">4</div><div class="slab">Review</div></div>
+        <div class="link"></div>
+        <div class="stop"><div class="disc">5</div><div class="slab">Deliver</div></div>
+      </div>
+      <div class="meter"><i style="width:24%"></i></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="eyebrow" style="margin-bottom:14px">Stop states</div>
+    <div class="states">
+      <div class="st">
+        <div class="disc">3</div>
+        <div><div class="sname">Upcoming</div><div class="sdesc">Grey outline, not clickable</div></div>
+      </div>
+      <div class="st">
+        <div class="disc" style="background:#003087;border-color:#003087;color:#fff;box-shadow:0 0 0 4px rgba(0,48,135,.13)">3</div>
+        <div><div class="sname">Current</div><div class="sdesc">Blue fill and halo, label in brand blue</div></div>
+      </div>
+      <div class="st">
+        <div class="disc" style="background:#00b4d8;border-color:#00b4d8;color:#fff"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+        <div><div class="sname">Done</div><div class="sdesc">Cyan fill, clickable to go back</div></div>
+      </div>
+      <div class="st">
+        <div class="disc" style="border-color:#f59e0b;color:#b45309">!</div>
+        <div><div class="sname">Needs you</div><div class="sdesc">Amber ring — unanswered questions</div></div>
+      </div>
+      <div class="st">
+        <div class="disc" style="border-color:#dc2626;color:#dc2626">✕</div>
+        <div><div class="sname">Failed</div><div class="sdesc">Generation error, retry from here</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" style="background:#fff">
+    <div class="eyebrow" style="margin-bottom:13px">Rules that keep it honest</div>
+    <div class="rules">
+      <div class="rule"><span class="rn">1</span><div>The rail lives in the shell, above the router. Changing step swaps only the panel below it — no reload, no flicker, no re-entry animation.</div></div>
+      <div class="rule"><span class="rn">2</span><div>The underline is real progress: weighted by sections confirmed, never by time elapsed or a fake creep to 90%.</div></div>
+      <div class="rule"><span class="rn">3</span><div>It never runs backwards. Regenerating one section in step 4 does not drop the rail back to step 3.</div></div>
+      <div class="rule"><span class="rn">4</span><div>A completed stop is a link. Consultants revisit scope constantly and should not have to restart to change a package name.</div></div>
+      <div class="rule"><span class="rn">5</span><div>Sub-labels carry the count that matters at that moment — "5 of 12 confirmed" — so the second progress layer is readable from the rail alone.</div></div>
+      <div class="rule"><span class="rn">6</span><div>State is server-side on the session. Closing the tab and coming back tomorrow restores the same stop, mid-review.</div></div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

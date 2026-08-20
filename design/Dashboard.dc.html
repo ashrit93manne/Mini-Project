@@ -1,0 +1,175 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:'Segoe UI',Calibri,system-ui,sans-serif;background:#eef1f7;color:#0a1f44}
+a{color:#003087}a:hover{color:#002368}
+.app{display:flex;width:1440px;height:900px;background:#f4f6fb;overflow:hidden}
+.nav{width:64px;background:#001b4d;display:flex;flex-direction:column;align-items:center;gap:4px;padding:14px 0}
+.mark{width:36px;height:36px;border-radius:9px;background:#00b4d8;color:#001b4d;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;margin-bottom:10px}
+.navi{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#8ea6d8}
+.navi.on{background:rgba(255,255,255,.14);color:#fff}
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.hdr{height:56px;background:#003087;display:flex;align-items:center;gap:12px;padding:0 20px;color:#fff;flex-shrink:0}
+.dtitle{font-size:14px;font-weight:600;color:#fff}
+.spacer{flex:1}
+.ava{width:30px;height:30px;border-radius:50%;background:#00b4d8;color:#00284d;font-size:11.5px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.body{flex:1;overflow:hidden;padding:26px 32px}
+.h1{font-size:23px;font-weight:700;margin:0 0 3px;color:#0a1f44}
+.sub{font-size:13px;color:#64748b;margin:0}
+.btn{height:36px;border-radius:8px;padding:0 15px;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:7px;border:1px solid #d5deec;background:#fff;color:#003087}
+.btn.pri{background:#003087;border-color:#003087;color:#fff;box-shadow:0 2px 8px rgba(0,48,135,.22)}
+.filters{display:flex;gap:8px;margin:20px 0 14px;align-items:center}
+.pill{height:32px;border-radius:20px;padding:0 14px;font-size:12.5px;font-weight:600;display:inline-flex;align-items:center;border:1px solid #e2e8f0;background:#fff;color:#64748b}
+.pill.on{background:#eef4ff;border-color:#c9daf8;color:#003087}
+.search{height:32px;flex:1;max-width:280px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;display:flex;align-items:center;gap:8px;padding:0 11px;font-size:12.5px;color:#a0aec0}
+.tbl{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e6ebf3;border-radius:12px;overflow:hidden;font-size:13px}
+.tbl th{text-align:left;font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;color:#7d8ba1;font-weight:700;padding:11px 16px;background:#f7f9fc;border-bottom:1px solid #e6ebf3}
+.tbl td{padding:14px 16px;border-bottom:1px solid #f1f4f9;color:#3d4a60;vertical-align:middle}
+.dname{font-size:13.5px;font-weight:600;color:#0a1f44}
+.dmeta{font-size:11.5px;color:#8a97ab;margin-top:2px}
+.tag{font-size:11px;font-weight:600;padding:3px 9px;border-radius:5px;background:#eef4ff;color:#003087}
+.mini{display:flex;align-items:center;gap:3px}
+.md{width:9px;height:9px;border-radius:50%;background:#e2e8f0}
+.md.done{background:#00b4d8}
+.md.now{background:#003087;box-shadow:0 0 0 3px rgba(0,48,135,.14)}
+.mlab{font-size:11.5px;color:#64748b;margin-left:8px}
+.act{font-size:12.5px;font-weight:600;color:#003087}
+.state{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:20px}
+</style>
+</helmet>
+
+<div class="app">
+  <aside class="nav">
+    <div class="mark">TD</div>
+    <div class="navi"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
+    <div class="navi on"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg></div>
+    <div class="navi"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg></div>
+    <div class="spacer"></div>
+    <div class="navi"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg></div>
+  </aside>
+
+  <div class="main">
+    <header class="hdr">
+      <span class="dtitle">Technical Design Generator</span>
+      <div class="spacer"></div>
+      <span style="font-size:11.5px;color:rgba(255,255,255,.62)">Ashrith M · SAP MM</span>
+      <div class="ava">AM</div>
+    </header>
+
+    <div class="body">
+      <div style="display:flex;align-items:flex-start;gap:16px">
+        <div>
+          <h1 class="h1">Technical designs</h1>
+          <p class="sub">Every design starts from an approved Functional Specification.</p>
+        </div>
+        <div class="spacer"></div>
+        <div class="btn pri"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>New technical design</div>
+      </div>
+
+      <div class="filters">
+        <span class="pill on">All</span>
+        <span class="pill">In progress</span>
+        <span class="pill">Awaiting my review</span>
+        <span class="pill">Delivered</span>
+        <div class="spacer"></div>
+        <div class="search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>Search by object, module or FS</div>
+      </div>
+
+      <table class="tbl">
+        <tr>
+          <th style="width:32%">Design</th>
+          <th style="width:12%">Type</th>
+          <th style="width:26%">Workflow</th>
+          <th style="width:16%">Updated</th>
+          <th style="width:14%"></th>
+        </tr>
+        <tr>
+          <td>
+            <div class="dname">Vendor Ageing Report – FI</div>
+            <div class="dmeta">FS_VendorAgeing_v2.docx · S/4HANA 2023</div>
+          </td>
+          <td><span class="tag">Report</span></td>
+          <td>
+            <div class="mini">
+              <span class="md done"></span><span class="md done"></span><span class="md done"></span><span class="md now"></span><span class="md"></span>
+              <span class="mlab">Review · 5 of 12 confirmed</span>
+            </div>
+          </td>
+          <td style="font-size:12.5px;color:#64748b">Today, 14:22</td>
+          <td><span class="act">Resume →</span></td>
+        </tr>
+        <tr>
+          <td>
+            <div class="dname">Sales Order Inbound IDoc</div>
+            <div class="dmeta">FS_SO_Inbound_ORDERS05.pdf · S/4HANA 2023</div>
+          </td>
+          <td><span class="tag">Interface</span></td>
+          <td>
+            <div class="mini">
+              <span class="md done"></span><span class="md done"></span><span class="md now"></span><span class="md"></span><span class="md"></span>
+              <span class="mlab">Generating · 8 of 12 drafted</span>
+            </div>
+          </td>
+          <td style="font-size:12.5px;color:#64748b">Today, 13:40</td>
+          <td><span class="act">Open →</span></td>
+        </tr>
+        <tr>
+          <td>
+            <div class="dname">Goods Receipt Validation (MIGO)</div>
+            <div class="dmeta">FS_GR_Validation_v1.docx · S/4HANA 2023</div>
+          </td>
+          <td><span class="tag">Enhancement</span></td>
+          <td>
+            <div class="mini">
+              <span class="md done"></span><span class="md done"></span><span class="md done"></span><span class="md done"></span><span class="md done"></span>
+              <span class="mlab" style="color:#047857;font-weight:600">Delivered · v1.0</span>
+            </div>
+          </td>
+          <td style="font-size:12.5px;color:#64748b">Yesterday</td>
+          <td><span class="act">Download</span></td>
+        </tr>
+        <tr>
+          <td>
+            <div class="dname">Batch Characteristics Extract</div>
+            <div class="dmeta">FS_BatchChar_v3.docx · S/4HANA 2023</div>
+          </td>
+          <td><span class="tag">Interface</span></td>
+          <td>
+            <div class="mini">
+              <span class="md done"></span><span class="md now"></span><span class="md"></span><span class="md"></span><span class="md"></span>
+              <span class="mlab" style="color:#92400e;font-weight:600">Scope · 3 open questions</span>
+            </div>
+          </td>
+          <td style="font-size:12.5px;color:#64748b">18 Aug</td>
+          <td><span class="act">Resume →</span></td>
+        </tr>
+        <tr>
+          <td>
+            <div class="dname">Purchase Requisition Release Report</div>
+            <div class="dmeta">FS_PR_Release_v1.docx · S/4HANA 2023</div>
+          </td>
+          <td><span class="tag">Report</span></td>
+          <td>
+            <div class="mini">
+              <span class="md done"></span><span class="md done"></span><span class="md done"></span><span class="md done"></span><span class="md done"></span>
+              <span class="mlab" style="color:#047857;font-weight:600">Delivered · v1.2</span>
+            </div>
+          </td>
+          <td style="font-size:12.5px;color:#64748b">15 Aug</td>
+          <td><span class="act">Download</span></td>
+        </tr>
+      </table>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

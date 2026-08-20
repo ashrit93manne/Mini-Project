@@ -1,0 +1,148 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:'Segoe UI',Calibri,system-ui,sans-serif;background:#eef1f7;color:#0a1f44}
+a{color:#003087}a:hover{color:#002368}
+.app{display:flex;width:1440px;height:900px;background:#f4f6fb;overflow:hidden}
+.nav{width:64px;background:#001b4d;display:flex;flex-direction:column;align-items:center;gap:4px;padding:14px 0}
+.mark{width:36px;height:36px;border-radius:9px;background:#00b4d8;color:#001b4d;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;margin-bottom:10px}
+.navi{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#8ea6d8}
+.navi.on{background:rgba(255,255,255,.14);color:#fff}
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.hdr{height:56px;background:#003087;display:flex;align-items:center;gap:12px;padding:0 20px;color:#fff;flex-shrink:0}
+.crumb{font-size:12px;color:rgba(255,255,255,.6)}
+.dtitle{font-size:14px;font-weight:600;color:#fff}
+.spacer{flex:1}
+.ava{width:30px;height:30px;border-radius:50%;background:#00b4d8;color:#00284d;font-size:11.5px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.rail{background:#fff;border-bottom:1px solid #e2e8f0;padding:14px 24px 0;flex-shrink:0}
+.stops{display:flex;align-items:flex-start}
+.stop{display:flex;flex-direction:column;align-items:center;gap:4px;width:118px;flex-shrink:0}
+.disc{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;border:2px solid #cbd5e1;color:#94a3b8;background:#fff}
+.stop.done .disc{background:#00b4d8;border-color:#00b4d8;color:#fff}
+.stop.now .disc{background:#003087;border-color:#003087;color:#fff;box-shadow:0 0 0 4px rgba(0,48,135,.13)}
+.slab{font-size:12px;font-weight:600;color:#a0aec0}
+.stop.done .slab{color:#475569}
+.stop.now .slab{color:#003087}
+.ssub{font-size:10px;color:#b6c0cf}
+.stop.now .ssub{color:#5a7cc0}
+.link{flex:1;height:2px;background:#e6ebf3;margin-top:13px}
+.link.done{background:#00b4d8}
+.meter{height:3px;background:#eef1f7;margin:14px -24px 0}
+.meter i{display:block;height:3px;background:linear-gradient(90deg,#003087,#00b4d8)}
+.body{flex:1;overflow:hidden;display:flex;justify-content:center;padding:34px 32px}
+.col{width:780px;display:flex;flex-direction:column;gap:18px}
+.h1{font-size:22px;font-weight:700;margin:0 0 4px;color:#0a1f44}
+.sub{font-size:13.5px;color:#64748b;margin:0;line-height:1.55}
+.drop{border:2px dashed #c2d0e6;border-radius:14px;background:#fbfcff;padding:34px;display:flex;flex-direction:column;align-items:center;gap:9px;text-align:center}
+.dtxt{font-size:14.5px;font-weight:600;color:#0a1f44}
+.dhint{font-size:12px;color:#8a97ab}
+.btn{height:36px;border-radius:8px;padding:0 15px;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:7px;border:1px solid #d5deec;background:#fff;color:#003087}
+.btn.pri{background:#003087;border-color:#003087;color:#fff;box-shadow:0 2px 8px rgba(0,48,135,.22)}
+.card{background:#fff;border:1px solid #e6ebf3;border-radius:12px;padding:16px 18px;box-shadow:0 1px 3px rgba(10,31,68,.05)}
+.fname{font-size:13.5px;font-weight:700;color:#0a1f44}
+.fmeta{font-size:11.5px;color:#8a97ab;margin-top:2px}
+.eyebrow{font-size:10.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#8a97ab}
+.check{display:flex;align-items:flex-start;gap:9px;font-size:12.5px;color:#3d4a60;line-height:1.5}
+.ok{width:17px;height:17px;border-radius:50%;background:#dcfce7;color:#047857;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.warn{width:17px;height:17px;border-radius:50%;background:#fef6e0;color:#92400e;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;font-size:11px;font-weight:800}
+.note{display:flex;gap:9px;align-items:flex-start;background:#f0f9ff;border:1px solid #cfe9f7;border-radius:10px;padding:11px 14px;font-size:12.5px;color:#0c4a6e;line-height:1.55}
+</style>
+</helmet>
+
+<div class="app">
+  <aside class="nav">
+    <div class="mark">TD</div>
+    <div class="navi on"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
+    <div class="navi"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg></div>
+    <div class="navi"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg></div>
+    <div class="spacer"></div>
+    <div class="navi"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg></div>
+  </aside>
+
+  <div class="main">
+    <header class="hdr">
+      <span class="crumb">Technical Designs /</span>
+      <span class="dtitle">New technical design</span>
+      <div class="spacer"></div>
+      <div class="ava">AM</div>
+    </header>
+
+    <div class="rail">
+      <div class="stops">
+        <div class="stop now"><div class="disc">1</div><div class="slab">Source</div><div class="ssub">Functional Spec</div></div>
+        <div class="link"></div>
+        <div class="stop"><div class="disc">2</div><div class="slab">Scope</div><div class="ssub">Object &amp; context</div></div>
+        <div class="link"></div>
+        <div class="stop"><div class="disc">3</div><div class="slab">Generate</div><div class="ssub">AI drafting</div></div>
+        <div class="link"></div>
+        <div class="stop"><div class="disc">4</div><div class="slab">Review</div><div class="ssub">Section by section</div></div>
+        <div class="link"></div>
+        <div class="stop"><div class="disc">5</div><div class="slab">Deliver</div><div class="ssub">Word document</div></div>
+      </div>
+      <div class="meter"><i style="width:10%"></i></div>
+    </div>
+
+    <div class="body">
+      <div class="col">
+        <div>
+          <h1 class="h1">Start from the approved Functional Specification</h1>
+          <p class="sub">The technical design is written against this document. Every generated section keeps a reference back to the FS clause it came from.</p>
+        </div>
+
+        <div class="drop">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#7f9ac9" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5"/><path d="M4 15v3a2 2 0 002 2h12a2 2 0 002-2v-3"/></svg>
+          <div class="dtxt">Drop the FS here, or browse</div>
+          <div class="dhint">.docx or .pdf · up to 20 MB · one document per design</div>
+          <div class="btn" style="margin-top:5px">Browse files</div>
+        </div>
+
+        <div class="card">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="width:38px;height:38px;border-radius:9px;background:#eef4ff;color:#003087;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5"/></svg>
+            </div>
+            <div style="flex:1">
+              <div class="fname">FS_VendorAgeing_v2.docx</div>
+              <div class="fmeta">1.4 MB · 18 pages · uploaded 14:02</div>
+            </div>
+            <span style="font-size:11.5px;font-weight:600;color:#047857;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:20px;padding:4px 11px">Parsed</span>
+          </div>
+
+          <div style="height:1px;background:#f1f4f9;margin:15px -18px"></div>
+
+          <div class="eyebrow" style="margin-bottom:10px">What we read from it</div>
+          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px 24px">
+            <div class="check"><span class="ok"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></span>14 FS sections, incl. VOC and ROC</div>
+            <div class="check"><span class="ok"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></span>Object type reads as <strong style="color:#0a1f44">Report</strong></div>
+            <div class="check"><span class="ok"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></span>Module FI · company codes 1000, 1200</div>
+            <div class="check"><span class="ok"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></span>2 tables and 1 selection-screen mock-up</div>
+            <div class="check"><span class="warn">!</span>3 clauses need your answer before drafting</div>
+            <div class="check"><span class="warn">!</span>No sign-off date found in Document Control</div>
+          </div>
+        </div>
+
+        <div class="note">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>
+          <div>Nothing goes to the AI yet. You confirm the object type, system context and the open clauses on the next step — the draft is generated only after that.</div>
+        </div>
+
+        <div style="display:flex;gap:10px">
+          <div class="spacer"></div>
+          <div class="btn">Replace file</div>
+          <div class="btn pri">Continue to scope →</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

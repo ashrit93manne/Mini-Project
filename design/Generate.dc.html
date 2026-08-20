@@ -1,0 +1,165 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:'Segoe UI',Calibri,system-ui,sans-serif;background:#eef1f7;color:#0a1f44}
+a{color:#003087}a:hover{color:#002368}
+.app{display:flex;width:1440px;height:900px;background:#f4f6fb;overflow:hidden}
+.nav{width:64px;background:#001b4d;display:flex;flex-direction:column;align-items:center;gap:4px;padding:14px 0}
+.mark{width:36px;height:36px;border-radius:9px;background:#00b4d8;color:#001b4d;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;margin-bottom:10px}
+.navi{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#8ea6d8}
+.navi.on{background:rgba(255,255,255,.14);color:#fff}
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.hdr{height:56px;background:#003087;display:flex;align-items:center;gap:12px;padding:0 20px;color:#fff;flex-shrink:0}
+.crumb{font-size:12px;color:rgba(255,255,255,.6)}
+.dtitle{font-size:14px;font-weight:600;color:#fff}
+.spacer{flex:1}
+.ava{width:30px;height:30px;border-radius:50%;background:#00b4d8;color:#00284d;font-size:11.5px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.rail{background:#fff;border-bottom:1px solid #e2e8f0;padding:14px 24px 0;flex-shrink:0}
+.stops{display:flex;align-items:flex-start}
+.stop{display:flex;flex-direction:column;align-items:center;gap:4px;width:118px;flex-shrink:0}
+.disc{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;border:2px solid #cbd5e1;color:#94a3b8;background:#fff}
+.stop.done .disc{background:#00b4d8;border-color:#00b4d8;color:#fff}
+.stop.now .disc{background:#003087;border-color:#003087;color:#fff;box-shadow:0 0 0 4px rgba(0,48,135,.13)}
+.slab{font-size:12px;font-weight:600;color:#a0aec0}
+.stop.done .slab{color:#475569}
+.stop.now .slab{color:#003087}
+.ssub{font-size:10px;color:#b6c0cf}
+.stop.now .ssub{color:#5a7cc0}
+.link{flex:1;height:2px;background:#e6ebf3;margin-top:13px}
+.link.done{background:#00b4d8}
+.meter{height:3px;background:#eef1f7;margin:14px -24px 0}
+.meter i{display:block;height:3px;background:linear-gradient(90deg,#003087,#00b4d8)}
+.body{flex:1;overflow:hidden;display:flex;gap:22px;padding:28px 32px}
+.col{flex:1;display:flex;flex-direction:column;gap:16px;min-width:0}
+.side{width:320px;display:flex;flex-direction:column;gap:14px;flex-shrink:0}
+.h1{font-size:21px;font-weight:700;margin:0 0 4px;color:#0a1f44}
+.sub{font-size:13px;color:#64748b;margin:0}
+.card{background:#fff;border:1px solid #e6ebf3;border-radius:12px;padding:16px 18px;box-shadow:0 1px 3px rgba(10,31,68,.05)}
+.eyebrow{font-size:10.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#8a97ab}
+.big{height:8px;border-radius:5px;background:#eef1f7;overflow:hidden;margin-top:12px}
+.big i{display:block;height:8px;background:linear-gradient(90deg,#003087,#00b4d8);border-radius:5px}
+.row{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:9px;font-size:13px;color:#3d4a60}
+.row.run{background:#eef4ff;box-shadow:inset 2px 0 0 #003087}
+.row.wait{color:#a0aec0}
+.ico{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.ico.ok{background:#dcfce7;color:#047857}
+.ico.run{border:2.5px solid #cfe0ff;border-top-color:#003087}
+.ico.wait{border:2px dashed #d9e0ea}
+.meta{font-size:11.5px;color:#a0aec0;margin-left:auto;flex-shrink:0}
+.excerpt{font-size:12px;line-height:1.55;color:#5a6b85;font-style:italic;padding:0 12px 8px 43px}
+.btn{height:34px;border-radius:8px;padding:0 14px;font-size:12.5px;font-weight:600;display:inline-flex;align-items:center;gap:7px;border:1px solid #d5deec;background:#fff;color:#003087}
+.btn.ghost{border-color:transparent;background:transparent;color:#64748b}
+.tag{display:inline-flex;align-items:center;font-size:11px;font-weight:600;border-radius:6px;padding:3px 8px;background:#eef4ff;color:#003087;border:1px solid #dbe6fb}
+</style>
+</helmet>
+
+<div class="app">
+  <aside class="nav">
+    <div class="mark">TD</div>
+    <div class="navi on"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
+    <div class="navi"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg></div>
+    <div class="navi"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg></div>
+    <div class="spacer"></div>
+    <div class="navi"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg></div>
+  </aside>
+
+  <div class="main">
+    <header class="hdr">
+      <span class="crumb">Technical Designs /</span>
+      <span class="dtitle">Vendor Ageing Report – FI</span>
+      <div class="spacer"></div>
+      <span style="font-size:11.5px;color:rgba(255,255,255,.62)">Generating…</span>
+      <div class="ava">AM</div>
+    </header>
+
+    <div class="rail">
+      <div class="stops">
+        <div class="stop done"><div class="disc"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></div><div class="slab">Source</div><div class="ssub">FS uploaded</div></div>
+        <div class="link done"></div>
+        <div class="stop done"><div class="disc"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></div><div class="slab">Scope</div><div class="ssub">10 sections</div></div>
+        <div class="link done"></div>
+        <div class="stop now"><div class="disc">3</div><div class="slab">Generate</div><div class="ssub">6 of 10 drafted</div></div>
+        <div class="link"></div>
+        <div class="stop"><div class="disc">4</div><div class="slab">Review</div><div class="ssub">Section by section</div></div>
+        <div class="link"></div>
+        <div class="stop"><div class="disc">5</div><div class="slab">Deliver</div><div class="ssub">Word document</div></div>
+      </div>
+      <div class="meter"><i style="width:52%"></i></div>
+    </div>
+
+    <div class="body">
+      <div class="col">
+        <div>
+          <h1 class="h1">Drafting your technical design</h1>
+          <p class="sub">Each section is written against the confirmed scope and the FS. You can leave this running and come back.</p>
+        </div>
+
+        <div class="card" style="padding:15px 18px">
+          <div style="display:flex;align-items:baseline;gap:8px">
+            <span style="font-size:15px;font-weight:700;color:#0a1f44">6 of 10 sections drafted</span>
+            <span class="spacer"></span>
+            <span style="font-size:12px;color:#64748b">about 70 seconds left</span>
+          </div>
+          <div class="big"><i style="width:60%"></i></div>
+        </div>
+
+        <div class="card" style="padding:8px 6px;flex:1;overflow:hidden">
+          <div class="row"><span class="ico ok"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></span>Document Control<span class="meta">120 words · 4s</span></div>
+          <div class="row"><span class="ico ok"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></span>Requirement Understanding<span class="meta">310 words · 9s</span></div>
+          <div class="row"><span class="ico ok"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></span>Open Questions<span class="meta">1 carried forward · 3s</span></div>
+          <div class="row"><span class="ico ok"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></span>Proposed Solution<span class="meta">460 words · 14s</span></div>
+          <div class="row"><span class="ico ok"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></span>Architecture Overview<span class="meta">1 diagram · 18s</span></div>
+          <div class="row"><span class="ico ok"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></span>Object Inventory<span class="meta">5 objects · 11s</span></div>
+          <div class="row run"><span class="ico run"></span><strong style="font-weight:600;color:#003087">Data Design</strong><span class="meta" style="color:#5a7cc0">writing…</span></div>
+          <div class="excerpt">…field ZZ_AGEING_BUCKET is derived at runtime from the difference between the net due date and the key date, and is not persisted…</div>
+          <div class="row wait"><span class="ico wait"></span>Processing Logic<span class="meta">queued</span></div>
+          <div class="row wait"><span class="ico wait"></span>Security &amp; Authorization<span class="meta">queued</span></div>
+          <div class="row wait"><span class="ico wait"></span>Testing &amp; Validation<span class="meta">queued</span></div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="btn ghost">Cancel generation</div>
+          <div class="spacer"></div>
+          <span style="font-size:11.5px;color:#8a97ab">Review opens automatically when all 10 are drafted</span>
+        </div>
+      </div>
+
+      <aside class="side">
+        <div class="card" style="padding:14px 15px">
+          <span class="eyebrow">Grounded in</span>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">
+            <span class="tag">FS_VendorAgeing_v2.docx</span>
+            <span class="tag">S/4HANA 2023</span>
+            <span class="tag">FI – Accounts Payable</span>
+            <span class="tag">3 answered clauses</span>
+            <span class="tag">Report template v1.4</span>
+          </div>
+        </div>
+
+        <div class="card" style="padding:14px 15px">
+          <span class="eyebrow">Guardrails in force</span>
+          <div style="display:flex;flex-direction:column;gap:9px;margin-top:10px;font-size:12px;color:#3d4a60;line-height:1.5">
+            <div style="display:flex;gap:8px"><span style="color:#047857;flex-shrink:0">✓</span>No BAdI or exit name is written unless it exists in the release</div>
+            <div style="display:flex;gap:8px"><span style="color:#047857;flex-shrink:0">✓</span>No ABAP code — this is a design, not an implementation</div>
+            <div style="display:flex;gap:8px"><span style="color:#047857;flex-shrink:0">✓</span>Unanswered clauses stay as open questions, never guesses</div>
+          </div>
+        </div>
+
+        <div style="background:#f0f9ff;border:1px solid #cfe9f7;border-radius:10px;padding:11px 13px;font-size:11.5px;color:#0c4a6e;line-height:1.55">
+          Close the tab if you like — generation continues on the server and the design is waiting in <strong>My designs</strong>.
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

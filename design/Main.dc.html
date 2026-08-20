@@ -1,0 +1,238 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:'Segoe UI',Calibri,system-ui,sans-serif;background:#eef1f7;color:#0a1f44}
+a{color:#003087}a:hover{color:#002368}
+.app{display:flex;width:1440px;height:900px;background:#f4f6fb;overflow:hidden}
+.nav{width:64px;background:#001b4d;display:flex;flex-direction:column;align-items:center;gap:4px;padding:14px 0}
+.mark{width:36px;height:36px;border-radius:9px;background:#00b4d8;color:#001b4d;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;margin-bottom:10px}
+.navi{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#8ea6d8}
+.navi.on{background:rgba(255,255,255,.14);color:#fff}
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.hdr{height:56px;background:#003087;display:flex;align-items:center;gap:12px;padding:0 20px;color:#fff;flex-shrink:0}
+.crumb{font-size:12px;color:rgba(255,255,255,.6)}
+.dtitle{font-size:14px;font-weight:600;color:#fff}
+.chip{font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:rgba(255,255,255,.14);color:#cfe3ff}
+.spacer{flex:1}
+.ava{width:30px;height:30px;border-radius:50%;background:#00b4d8;color:#00284d;font-size:11.5px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.rail{background:#fff;border-bottom:1px solid #e2e8f0;padding:14px 24px 0;flex-shrink:0}
+.stops{display:flex;align-items:flex-start}
+.stop{display:flex;flex-direction:column;align-items:center;gap:4px;width:118px;flex-shrink:0}
+.disc{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;border:2px solid #cbd5e1;color:#94a3b8;background:#fff}
+.stop.done .disc{background:#00b4d8;border-color:#00b4d8;color:#fff}
+.stop.now .disc{background:#003087;border-color:#003087;color:#fff;box-shadow:0 0 0 4px rgba(0,48,135,.13)}
+.slab{font-size:12px;font-weight:600;color:#a0aec0}
+.stop.done .slab{color:#475569}
+.stop.now .slab{color:#003087}
+.ssub{font-size:10px;color:#b6c0cf}
+.stop.now .ssub{color:#5a7cc0}
+.link{flex:1;height:2px;background:#e6ebf3;margin-top:13px}
+.link.done{background:#00b4d8}
+.meter{height:3px;background:#eef1f7;margin:14px -24px 0}
+.meter i{display:block;height:3px;background:linear-gradient(90deg,#003087,#00b4d8)}
+.body{flex:1;display:flex;min-height:0}
+.pnav{width:262px;background:#fff;border-right:1px solid #e2e8f0;display:flex;flex-direction:column;flex-shrink:0}
+.pdoc{flex:1;display:flex;flex-direction:column;min-width:0;background:#f4f6fb}
+.pai{width:340px;background:#fff;border-left:1px solid #e2e8f0;display:flex;flex-direction:column;flex-shrink:0}
+.ph{padding:14px 16px;border-bottom:1px solid #eef1f7}
+.eyebrow{font-size:10.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#8a97ab}
+.bar{height:6px;border-radius:4px;background:#eef1f7;overflow:hidden;margin-top:8px}
+.bar i{display:block;height:6px;background:#00b4d8}
+.slist{flex:1;overflow:hidden;padding:6px 8px}
+.srow{display:flex;align-items:center;gap:9px;padding:8px 9px;border-radius:8px;font-size:12.5px;color:#475569}
+.srow.cur{background:#eef4ff;color:#003087;font-weight:600;box-shadow:inset 2px 0 0 #003087}
+.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.num{font-size:11px;color:#a0aec0;width:14px;flex-shrink:0}
+.srow.cur .num{color:#5a7cc0}
+.doc{flex:1;overflow:hidden;padding:22px 30px}
+.sheet{background:#fff;border:1px solid #e6ebf3;border-radius:12px;box-shadow:0 1px 3px rgba(10,31,68,.05)}
+.sec{padding:20px 28px;border-bottom:1px solid #f1f4f9}
+.sech{font-size:16px;font-weight:700;color:#0a1f44;margin:0 0 4px}
+.p{font-size:13.5px;line-height:1.62;color:#3d4a60;margin:0 0 10px}
+.trace{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:600;color:#0369a1;background:#e0f5fb;border-radius:5px;padding:2px 7px}
+.tbl{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:4px}
+.tbl th{text-align:left;font-size:10.5px;letter-spacing:.5px;text-transform:uppercase;color:#7d8ba1;font-weight:700;padding:7px 10px;background:#f7f9fc;border-bottom:1px solid #e6ebf3}
+.tbl td{padding:8px 10px;border-bottom:1px solid #f1f4f9;color:#3d4a60}
+.mono{font-family:'Cascadia Mono',Consolas,monospace;font-size:12px;color:#0a1f44}
+.flag{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:600;color:#92400e;background:#fef6e0;border:1px solid #fadf9e;border-radius:5px;padding:1px 6px}
+.sectb{display:flex;align-items:center;gap:8px;padding:11px 28px;background:#f7f9fd;border-bottom:1px solid #e6ebf3;border-radius:12px 12px 0 0}
+.btn{height:32px;border-radius:7px;padding:0 13px;font-size:12.5px;font-weight:600;display:inline-flex;align-items:center;gap:6px;border:1px solid #d5deec;background:#fff;color:#003087;cursor:pointer}
+.btn.pri{background:#003087;border-color:#003087;color:#fff}
+.btn.ghost{border-color:transparent;background:transparent;color:#64748b}
+.tabs{display:flex;gap:2px;padding:0 12px;border-bottom:1px solid #eef1f7}
+.tab{font-size:12.5px;font-weight:600;color:#8a97ab;padding:12px 10px;border-bottom:2px solid transparent}
+.tab.on{color:#003087;border-bottom-color:#003087}
+.card{border:1px solid #e6ebf3;border-radius:10px;padding:11px 13px;background:#fff}
+.ctitle{font-size:12.5px;font-weight:700;color:#0a1f44;margin:0 0 3px;line-height:1.4}
+.cbody{font-size:11.5px;line-height:1.55;color:#64748b;margin:0}
+.composer{border-top:1px solid #eef1f7;padding:12px 14px;background:#fbfcfe}
+.ta{border:1.5px solid #dde5f2;border-radius:9px;background:#fff;padding:9px 11px;font-size:12.5px;color:#94a3b8;min-height:58px}
+.qa{font-size:11.5px;font-weight:600;color:#003087;background:#eef4ff;border:1px solid #dbe6fb;border-radius:20px;padding:5px 11px}
+.footbar{display:flex;align-items:center;gap:10px;padding:12px 30px;background:#fff;border-top:1px solid #e2e8f0}
+</style>
+</helmet>
+
+<div class="app">
+  <aside class="nav">
+    <div class="mark">TD</div>
+    <div class="navi"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
+    <div class="navi on"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg></div>
+    <div class="navi"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg></div>
+    <div class="spacer"></div>
+    <div class="navi"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg></div>
+  </aside>
+
+  <div class="main">
+    <header class="hdr">
+      <span class="crumb">Technical Designs /</span>
+      <span class="dtitle">Vendor Ageing Report – FI</span>
+      <span class="chip">Report · S/4HANA 2023</span>
+      <div class="spacer"></div>
+      <span style="font-size:11.5px;color:rgba(255,255,255,.62)">Autosaved 14:22</span>
+      <div class="ava">AM</div>
+    </header>
+
+    <div class="rail">
+      <div class="stops">
+        <div class="stop done"><div class="disc"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></div><div class="slab">Source</div><div class="ssub">FS uploaded</div></div>
+        <div class="link done"></div>
+        <div class="stop done"><div class="disc"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></div><div class="slab">Scope</div><div class="ssub">12 sections</div></div>
+        <div class="link done"></div>
+        <div class="stop done"><div class="disc"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></div><div class="slab">Generate</div><div class="ssub">Draft ready</div></div>
+        <div class="link done"></div>
+        <div class="stop now"><div class="disc">4</div><div class="slab">Review</div><div class="ssub">5 of 12 confirmed</div></div>
+        <div class="link"></div>
+        <div class="stop"><div class="disc">5</div><div class="slab">Deliver</div><div class="ssub">Word document</div></div>
+      </div>
+      <div class="meter"><i style="width:74%"></i></div>
+    </div>
+
+    <div class="body">
+      <!-- LEFT: section navigator -->
+      <aside class="pnav">
+        <div class="ph">
+          <div class="eyebrow">Document progress</div>
+          <div style="display:flex;align-items:baseline;gap:6px;margin-top:5px">
+            <span style="font-size:19px;font-weight:700;color:#0a1f44">5</span>
+            <span style="font-size:12.5px;color:#64748b">of 12 sections confirmed</span>
+          </div>
+          <div class="bar"><i style="width:42%"></i></div>
+        </div>
+        <div class="slist">
+          <div class="srow"><span class="num">1</span><span class="dot" style="background:#22c55e"></span>Document Control</div>
+          <div class="srow"><span class="num">2</span><span class="dot" style="background:#22c55e"></span>Requirement Understanding</div>
+          <div class="srow"><span class="num">3</span><span class="dot" style="background:#f59e0b"></span>Open Questions<span style="margin-left:auto;font-size:10.5px;font-weight:700;color:#92400e;background:#fef6e0;border-radius:10px;padding:1px 7px">2</span></div>
+          <div class="srow"><span class="num">4</span><span class="dot" style="background:#22c55e"></span>Proposed Solution</div>
+          <div class="srow"><span class="num">5</span><span class="dot" style="background:#22c55e"></span>Architecture Overview</div>
+          <div class="srow cur"><span class="num">6</span><span class="dot" style="background:#003087"></span>Object Inventory</div>
+          <div class="srow"><span class="num">7</span><span class="dot" style="background:#cbd5e1"></span>Data Design</div>
+          <div class="srow"><span class="num">8</span><span class="dot" style="background:#cbd5e1"></span>Processing Logic</div>
+          <div class="srow"><span class="num">9</span><span class="dot" style="background:#cbd5e1"></span>Integration Design</div>
+          <div class="srow"><span class="num">10</span><span class="dot" style="background:#cbd5e1"></span>Security &amp; Authorization</div>
+          <div class="srow"><span class="num">11</span><span class="dot" style="background:#cbd5e1"></span>Error Handling</div>
+          <div class="srow"><span class="num">12</span><span class="dot" style="background:#cbd5e1"></span>Testing &amp; Validation</div>
+        </div>
+        <div style="padding:12px 14px;border-top:1px solid #eef1f7;display:flex;gap:8px">
+          <div class="btn" style="flex:1;justify-content:center">Preview document</div>
+        </div>
+      </aside>
+
+      <!-- CENTRE: document -->
+      <section class="pdoc">
+        <div class="doc">
+          <div class="sheet">
+            <!-- confirmed section above, dimmed -->
+            <div class="sec" style="opacity:.5">
+              <h3 class="sech">5. Architecture Overview</h3>
+              <p class="p">The report runs as a classic ABAP executable in the FI module, reading open items via a CDS view and rendering results in ALV. No external system is involved.</p>
+              <svg width="640" height="94" viewBox="0 0 640 94" fill="none" style="max-width:100%">
+                <rect x="1" y="24" width="150" height="46" rx="8" fill="#f7f9fc" stroke="#d5deec"/>
+                <text x="76" y="44" font-size="11" font-weight="700" fill="#0a1f44" text-anchor="middle">S/4HANA · FI</text>
+                <text x="76" y="59" font-size="10" fill="#64748b" text-anchor="middle">BSIK / BSAK</text>
+                <path d="M151 47h56" stroke="#a9b8d0" stroke-width="1.5"/><path d="M201 43l6 4-6 4" fill="#a9b8d0"/>
+                <rect x="207" y="24" width="180" height="46" rx="8" fill="#eef4ff" stroke="#003087"/>
+                <text x="297" y="44" font-size="11" font-weight="700" fill="#003087" text-anchor="middle">ZFIR_VENDAGE</text>
+                <text x="297" y="59" font-size="10" fill="#5a7cc0" text-anchor="middle">CDS + ALV report</text>
+                <path d="M387 47h56" stroke="#a9b8d0" stroke-width="1.5"/><path d="M437 43l6 4-6 4" fill="#a9b8d0"/>
+                <rect x="443" y="24" width="150" height="46" rx="8" fill="#f7f9fc" stroke="#d5deec"/>
+                <text x="518" y="44" font-size="11" font-weight="700" fill="#0a1f44" text-anchor="middle">ALV / Spool</text>
+                <text x="518" y="59" font-size="10" fill="#64748b" text-anchor="middle">Excel export</text>
+              </svg>
+            </div>
+
+            <!-- active section -->
+            <div class="sectb">
+              <span style="font-size:12.5px;font-weight:700;color:#003087">Section 6 · Object Inventory</span>
+              <span class="trace">Source: FS §4.1, §4.3</span>
+              <div class="spacer"></div>
+              <div class="btn ghost"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>Edit</div>
+              <div class="btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M21 12a9 9 0 11-3-6.7M21 4v5h-5"/></svg>Regenerate</div>
+            </div>
+            <div class="sec" style="border-bottom:none">
+              <p class="p">The development introduces one executable report, one CDS view and one authorisation-relevant selection screen. All objects sit in package <span class="mono">ZFI_REPORTS</span> and travel on transport <span class="mono">DEVK905312</span>.</p>
+              <table class="tbl">
+                <tr><th style="width:26%">Object</th><th style="width:16%">Type</th><th>Purpose</th></tr>
+                <tr><td class="mono">ZFIR_VENDAGE</td><td>Report</td><td>Executable ABAP report, ALV output with ageing buckets</td></tr>
+                <tr><td class="mono">ZI_VendorOpenItem</td><td>CDS view</td><td>Open vendor items with ageing bucket calculation</td></tr>
+                <tr><td class="mono">ZZ_AGEING_BUCKET</td><td>Data element</td><td>Bucket label — 0–30, 31–60, 61–90, 90+ <span class="flag">length differs from FS</span></td></tr>
+                <tr><td class="mono">S_ZFI_VEND</td><td>Auth. object</td><td>Restricts output by company code and vendor account group</td></tr>
+                <tr><td class="mono">ME_PROCESS_PO_CUST</td><td>BAdI</td><td>Referenced for downstream validation <span class="flag">not verified in target system</span></td></tr>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div class="footbar">
+          <div class="btn ghost">← Previous section</div>
+          <div class="spacer"></div>
+          <div class="btn">Confirm all remaining</div>
+          <div class="btn pri">Confirm section &amp; next →</div>
+        </div>
+      </section>
+
+      <!-- RIGHT: AI assist -->
+      <aside class="pai">
+        <div class="tabs">
+          <div class="tab">Assist</div>
+          <div class="tab on">Checks <span style="font-size:10.5px;font-weight:700;color:#92400e;background:#fef6e0;border-radius:10px;padding:1px 6px;margin-left:2px">3</span></div>
+          <div class="tab">Sources</div>
+        </div>
+        <div style="flex:1;overflow:hidden;padding:14px;display:flex;flex-direction:column;gap:10px">
+          <div class="card" style="border-left:3px solid #f59e0b">
+            <p class="ctitle">BAdI not verified in target system</p>
+            <p class="cbody"><span class="mono" style="font-size:11.5px">ME_PROCESS_PO_CUST</span> is named in section 6 but was not confirmed to exist in S/4HANA 2023. Replace with a validation note for the ABAP team.</p>
+            <div style="display:flex;gap:7px;margin-top:9px"><span class="qa">Rewrite as validation note</span><span class="qa" style="background:#f7f9fc;color:#64748b;border-color:#e6ebf3">Dismiss</span></div>
+          </div>
+          <div class="card" style="border-left:3px solid #f59e0b">
+            <p class="ctitle">Field length conflicts with the FS</p>
+            <p class="cbody"><span class="mono" style="font-size:11.5px">ZZ_AGEING_BUCKET</span> is CHAR(10) here; FS §3.4 specifies CHAR(12). One of the two is wrong.</p>
+            <div style="display:flex;gap:7px;margin-top:9px"><span class="qa">Align to FS §3.4</span><span class="qa" style="background:#f7f9fc;color:#64748b;border-color:#e6ebf3">Dismiss</span></div>
+          </div>
+          <div class="card" style="border-left:3px solid #94a3b8">
+            <p class="ctitle">No negative-path test case</p>
+            <p class="cbody">Section 12 has no scenario for a vendor with zero open items. Add before the design goes to review.</p>
+            <div style="display:flex;gap:7px;margin-top:9px"><span class="qa">Add test case</span><span class="qa" style="background:#f7f9fc;color:#64748b;border-color:#e6ebf3">Dismiss</span></div>
+          </div>
+        </div>
+        <div class="composer">
+          <div class="eyebrow" style="margin-bottom:7px">Refine this section</div>
+          <div class="ta">Tell the assistant what should change in Object Inventory…</div>
+          <div style="display:flex;gap:7px;margin-top:9px;flex-wrap:wrap">
+            <span class="qa">Add enhancement spot detail</span>
+            <span class="qa">Shorten</span>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>
