@@ -92,143 +92,172 @@ body {
  * staying inside the picker — the bug that made the invisible file
  * input intercept clicks meant for the tray next to it.
  */
-.sca-attachment-bar-host .form-group,
-.sca-attachment-bar-host .card-body {
+.sca-attachment-bar-host .form-group:not(.formio-component-attachmentPicker),
+.sca-attachment-bar-host .card-body:not(.formio-component-attachmentPicker) {
     display: contents !important;
 }
 
-/* ---------------------------------------------------------
-   24B. FILE PICKER — DECLARED FORM.IO FILE COMPONENT
+/*
+ * The tray host carries the whole visible attachment row (the attach
+ * button and the chip tray), so it takes the bar's remaining width.
+ * The picker beside it is clipped to 1px and contributes nothing.
+ */
+.sca-attachment-bar-host > .formio-component-attachmentTrayHost {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
 
-   Form.io's default file component renders a full drop-zone
-   with instructional text. That default is a correct, working
-   control on its own — everything below only compacts its
-   appearance into a small pill; if any selector here misses
-   the platform's exact internal markup, the component still
-   renders and still works, just with Form.io's own, plainer
-   look, which is a safe degradation rather than a silent one.
+    margin: 0 !important;
+}
+
+.sca-attachment-bar-host > .formio-component-attachmentTrayHost > div {
+    display: flex !important;
+    align-items: center !important;
+
+    width: 100% !important;
+    min-width: 0 !important;
+}
+
+/* ---------------------------------------------------------
+   24B. FILE PICKER — HIDDEN, KEPT FOR ITS VALUE
+
+   The declared Form.io `file` component (key: attachmentPicker)
+   is what actually opens the platform's file dialog and what
+   holds the picked files as base64 in the submission. None of
+   its own markup is shown.
+
+   Earlier releases tried to dress that markup up instead:
+   compact the drop-zone into a pill, relabel its browse link,
+   and hide its file list — the last two from JavaScript, by
+   adding classes at runtime. That approach failed in the real
+   deployment. Form.io re-renders the component whenever its
+   value changes, and the controller runs on the form's data
+   lifecycle rather than after paint, so whether the decoration
+   was applied at any given moment was a matter of timing. When
+   it was not, the component's stock chrome showed through: an
+   empty "File Name / Size" table floating above the message
+   box and a "Drop files to attach, or browse" zone lying
+   across it. That is exactly what the screenshots of the
+   deployed app show.
+
+   So the component is hidden here STRUCTURALLY, keyed on the
+   class Form.io itself puts on it, with no dependency on any
+   script having run. What the developer sees is #sca-attach-button,
+   plain HTML in a declared htmlelement (24B2).
+
+   It is hidden the accessible-name-preserving way — clipped to
+   a 1px box rather than display:none — because it must stay in
+   the layout and stay clickable: ScaAttachmentUi.openPicker()
+   clicks its [ref="fileBrowse"] to open the dialog, and chip
+   removal clicks its [ref="removeLink"] so Form.io's own value
+   stays authoritative. display:none would break both, exactly
+   as it would for the CSS-hidden loadConversations button this
+   app already drives the same way.
    --------------------------------------------------------- */
 
+.sca-attachment-bar-host .formio-component-attachmentPicker,
 .formio-component-attachmentPicker {
-    flex: 0 0 auto !important;
-
-    width: auto !important;
-    max-width: 168px !important;
-
-    margin: 0 !important;
-}
-
-.formio-component-attachmentPicker label {
-    display: none !important;
-}
-
-.formio-component-attachmentPicker .form-group,
-.formio-component-attachmentPicker .formio-component {
-    margin: 0 !important;
-}
-
-/*
- * The drop-zone / browse control, whatever its exact inner markup.
- * Compacted into a small pill matching the app's existing button
- * language (rounded, bordered, blue-on-hover) rather than the
- * default large dashed rectangle.
- */
-.formio-component-attachmentPicker .fileSelector,
-.formio-component-attachmentPicker [ref="fileDrop"] {
     /*
-     * A containing block for the real <input type="file"> Form.io's
-     * default template overlays on top of this dropzone at full size
-     * (opacity 0, position:absolute) so clicks anywhere on the visible
-     * pill open the file dialog. Without position:relative here, that
-     * input positions against the nearest ancestor that HAS one —
-     * which turned out to be the whole attachment bar — stretching an
-     * invisible click target across the tray sitting next to it.
+     * `visibility: hidden`, not `display: none`: the element must stay
+     * rendered so Form.io keeps its refs bound and so
+     * element.click() still reaches [ref="fileBrowse"] and
+     * [ref="removeLink"]. Unlike clipping alone, it also takes the
+     * component's stock text out of innerText and out of the
+     * accessibility tree, so "Drop files to attach, or browse" is not
+     * announced to a screen reader beside our own Attach button.
+     *
+     * `display: block` is restated because Form.io puts `form-group`
+     * on this component's own root, which the attachment bar's
+     * flattening rule above would otherwise collapse to
+     * `display: contents` — a box-less element cannot clip anything,
+     * which is exactly how the stock chrome leaked through.
      */
-    position: relative !important;
+    display: block !important;
+    visibility: hidden !important;
 
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    gap: 6px !important;
+    position: absolute !important;
 
-    width: auto !important;
-    max-width: 100% !important;
-    height: calc(var(--sca-attachment-bar-height) - 8px) !important;
+    width: 1px !important;
+    height: 1px !important;
+    max-width: 1px !important;
 
-    padding: 0 12px !important;
     margin: 0 !important;
+    padding: 0 !important;
 
-    border: 1px solid var(--sca-border) !important;
-    border-radius: 999px !important;
-
-    background: #ffffff !important;
-
-    color: var(--sca-muted) !important;
-    font-size: 12px !important;
-    font-weight: 600 !important;
+    overflow: hidden !important;
+    clip-path: inset(50%) !important;
     white-space: nowrap !important;
+
+    border: 0 !important;
+}
+
+/* ---------------------------------------------------------
+   24B2. THE ATTACH BUTTON
+
+   Declared markup inside attachmentTrayHost, so the platform
+   renders it the same way it renders the header and the
+   sidebar's "New Conversation" link — both of which have
+   always appeared correctly in production.
+   --------------------------------------------------------- */
+
+.sca-attachment-bar {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+
+    width: 100% !important;
+    min-width: 0 !important;
+}
+
+.sca-attach-button {
+    flex: 0 0 auto;
+
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+
+    height: 28px;
+    padding: 0 10px;
+
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    color: #475569;
+
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 999px;
 
     cursor: pointer;
 
-    transition:
-        background-color 120ms ease,
-        color 120ms ease,
-        border-color 120ms ease;
+    transition: border-color 120ms ease, color 120ms ease,
+        background-color 120ms ease;
 }
 
-.formio-component-attachmentPicker .fileSelector:hover,
-.formio-component-attachmentPicker [ref="fileDrop"]:hover {
-    background: var(--sca-blue-soft) !important;
-    border-color: var(--sca-blue) !important;
-    color: var(--sca-blue) !important;
+.sca-attach-button:hover {
+    color: #1d4ed8;
+    background: #eff6ff;
+    border-color: #93c5fd;
 }
 
-/*
- * A small paperclip glyph ahead of the (relabelled, by script) text,
- * matching the icon language used elsewhere in the composer.
- */
-.formio-component-attachmentPicker .fileSelector::before,
-.formio-component-attachmentPicker [ref="fileDrop"]::before {
-    content: "📎";
-
-    font-size: 13px;
-    line-height: 1;
+.sca-attach-button:focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: 2px;
 }
 
-.formio-component-attachmentPicker .fileSelector i,
-.formio-component-attachmentPicker [ref="fileDrop"] i {
-    display: none !important;
+.sca-attach-icon {
+    width: 13px;
+    height: 13px;
+
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
-/*
- * Form.io's default dropzone leads with its own instructional text —
- * "Drop files to attach, or" — ahead of the browse link decoratePicker()
- * (sca-attachment-ui.js) relabels to "Attach files". Left alone that
- * reads as a duplicated, verbose control; hidden here so the compact
- * pill shows only the one label. The <a> itself is untouched and stays
- * the real click target Form.io wires up.
- */
-.formio-component-attachmentPicker .fileSelector span,
-.formio-component-attachmentPicker [ref="fileDrop"] span {
-    display: none !important;
-}
-
-.formio-component-attachmentPicker .fileSelector a,
-.formio-component-attachmentPicker [ref="fileDrop"] a,
-.formio-component-attachmentPicker .browse {
-    color: inherit !important;
-    text-decoration: none !important;
-}
-
-/* Our own chip tray replaces this; see 24D. */
-.formio-component-attachmentPicker .sca-native-file-list-hidden {
-    display: none !important;
-}
-
-.formio-component-attachmentPicker.sca-picker-disabled,
-.formio-component-attachmentPicker[aria-disabled="true"] {
-    opacity: 0.55;
-    pointer-events: none;
+.sca-attach-label {
+    white-space: nowrap;
 }
 
 /* ---------------------------------------------------------

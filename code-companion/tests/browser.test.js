@@ -67,81 +67,44 @@ async function simulateBackendReply(page) {
     await page.waitForTimeout(200);
 }
 
+const MIME_BY_EXTENSION = {
+    ".docx":
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".pdf": "application/pdf",
+    ".txt": "text/plain",
+    ".md": "text/markdown",
+    ".markdown": "text/markdown",
+    ".png": "image/png"
+};
+
 /*
- * Playwright's setInputFiles waits for the target's bounding box to be
- * stable across consecutive frames. This controller's own periodic
- * sync (SCA-33, every 350ms) and MutationObserver (SCA-32) keep the DOM
- * churning by design — necessary in production, since Form.io can
- * remount the composer at any time — which means that wait never
- * reliably settles under Playwright: it was observed to pass instantly
- * in isolation and to hang for the full timeout with the periodic timer
- * left running, on otherwise-identical runs. This is a property of the
- * test harness's automation tooling, not of the page: a human clicking
- * the real browse control is unaffected, since it does not go through
- * this stability-wait codepath at all.
+ * Puts a file into the application the way the platform actually does:
+ * through the Form.io `file` component's own value.
  *
- * The timer is paused before picking a file and DELIBERATELY left
- * paused afterwards — re-creating it immediately was the specific
- * change that reintroduced the intermittent hang, most likely by
- * racing Playwright's own instrumentation. Nothing this suite still
- * checks after a file is attached depends on the periodic tick: chip
- * rendering happens synchronously inside the extraction promise chain,
- * not on a sync() cycle.
+ * Every earlier version of this helper drove `page.setInputFiles` at
+ * `.formio-component-attachmentPicker input[type="file"]` — an element
+ * that only ever existed because the old harness hand-wrote it. Real
+ * Form.io has no persistent file input: File.browseFiles() creates one
+ * on document.body, clicks it, and removes it again in its own change
+ * handler. What the platform leaves behind is the component's VALUE,
+ * an array of objects produced by the base64 storage provider, which is
+ * what this writes.
+ *
+ * A whole apparatus of retries, timer-pausing and value-clearing used to
+ * live here to coax Playwright's actionability wait through that
+ * imaginary input. None of it is needed against the real value channel.
  */
-async function attachFile(page, selector, filePath) {
-    await page.evaluate(() => {
-        const c = window.__sapCodeAgentController;
+async function attachFile(page, filePath) {
+    const bytes = fs.readFileSync(filePath);
+    const name = path.basename(filePath);
+    const mime =
+        MIME_BY_EXTENSION[path.extname(name).toLowerCase()] ||
+        "application/octet-stream";
 
-        if (c && c.timer) {
-            clearInterval(c.timer);
-            c.timer = null;
-        }
-
-        if (c && c.observer) {
-            c.observer.disconnect();
-        }
-    });
-
-    /*
-     * A native file input does not fire "change" when the same file
-     * path is set twice in a row — the browser sees no change in its
-     * value, so no event is dispatched, and SCA-37 (correctly) never
-     * hears about it. Clearing the value first guarantees the next
-     * setInputFiles is a genuine empty-to-populated transition, which
-     * always fires "change" — this is what a real OS file dialog does
-     * every time regardless of which file was picked before, so this
-     * only removes an automation-specific gap, not a real one.
-     */
-    await page.evaluate((sel) => {
-        const input = document.querySelector(sel);
-
-        if (input) {
-            input.value = "";
-        }
-    }, selector);
-
-    /*
-     * The pause above removes the specific cause identified during
-     * development, but the underlying wait has still been observed to
-     * hang intermittently in this sandboxed environment even with the
-     * timer stopped (most likely scheduler contention affecting
-     * Chromium's own frame timing, which Playwright's actionability
-     * poll depends on) — a short retry absorbs that without masking a
-     * real failure, since a genuinely broken picker fails identically
-     * on every attempt.
-     */
-    let lastError = null;
-
-    for (let attempt = 1; attempt <= 3; attempt += 1) {
-        try {
-            await page.setInputFiles(selector, filePath, { timeout: 8000 });
-            return;
-        } catch (error) {
-            lastError = error;
-        }
-    }
-
-    throw lastError;
+    await page.evaluate(
+        (file) => window.__harnessAttach(file.name, file.mime, file.base64),
+        { name, mime, base64: bytes.toString("base64") }
+    );
 }
 
 /*
@@ -293,47 +256,142 @@ async function main() {
     );
 
     /* =====================================================
-     * File picker — v2, native Form.io component
+     * File picker — v3, against real Form.io markup
      *
-     * v1 built a paperclip button and an <input type="file"> in script
-     * and positioned them with absolute-CSS calculations against the
-     * real message box. It rendered nothing in the actual deployment.
-     * v2 no longer creates the input at all: SCA-37 only listens for a
-     * native "change" event delegated from whatever the platform's own
-     * `file` component renders (SELECTORS.pickerInput in
-     * sca-attachment-ui.js). These tests exercise exactly that contract
-     * — that picking a file through the native input reaches the
-     * extraction pipeline — rather than asserting on manufactured
-     * geometry this script no longer owns.
+     * v1 built a paperclip and an <input type="file"> in script and
+     * positioned them with absolute-CSS calculations. It rendered
+     * nothing in the real deployment.
+     *
+     * v2 kept a declared Form.io `file` component and listened for a
+     * native "change" delegated from an input "inside" it. That input
+     * does not exist: File.browseFiles() appends a transient input to
+     * document.body, clicks it, and removes it in its own change
+     * handler — so `closest('.formio-component-attachmentPicker
+     * input[type=file]')` can never match, in any Form.io version, and
+     * no file was ever ingested. The suite did not catch it because the
+     * harness hand-wrote that input.
+     *
+     * v3 stops touching Form.io's internals altogether. The component
+     * is kept for its behaviour and its VALUE, hidden by structural CSS
+     * keyed on its own stable component class; the visible affordance
+     * is our own markup in a declared htmlelement, which is the one
+     * thing that has always rendered correctly in production.
      * ===================================================== */
 
-    section("SCA-37 — native file picker");
-
-    const pickerInputSelector =
-        '.formio-component-attachmentPicker input[type="file"]';
+    section("SCA-37 — attachment control");
 
     check(
         "the picker's outer component is present",
-        await page.locator(".formio-component-attachmentPicker").count() > 0
+        (await page.locator(".formio-component-attachmentPicker").count()) > 0
     );
 
     check(
-        "the picker carries a real native file input",
-        await page.locator(pickerInputSelector).count() > 0
+        "Form.io never renders a persistent file input to listen to",
+        (await page
+            .locator('.formio-component-attachmentPicker input[type="file"]')
+            .count()) === 0,
+        "an input was found — the harness is faking Form.io again"
     );
 
     check(
-        "the browse trigger text was compacted by the controller",
-        (await page.locator('.formio-component-attachmentPicker a[ref="fileBrowse"]')
-            .textContent()) === "Attach files",
-        await page
-            .locator('.formio-component-attachmentPicker a[ref="fileBrowse"]')
-            .textContent()
+        "a visible attach control is rendered",
+        await page.evaluate(() => {
+            const button = document.querySelector("#sca-attach-button");
+            if (!button) return false;
+            const box = button.getBoundingClientRect();
+            return box.width > 20 && box.height > 20;
+        }),
+        await page.evaluate(() => {
+            const button = document.querySelector("#sca-attach-button");
+            return button
+                ? JSON.stringify(button.getBoundingClientRect())
+                : "#sca-attach-button missing";
+        })
+    );
+
+    check(
+        "Form.io's own file chrome is not visible anywhere",
+        await page.evaluate(() => {
+            const picker = document.querySelector(
+                ".formio-component-attachmentPicker"
+            );
+            if (!picker) return false;
+            /*
+             * checkVisibility, not getClientRects: the component is
+             * hidden with `visibility: hidden` so that its refs stay
+             * bound and element.click() still reaches them, and a
+             * visibility-hidden element still reports client rects.
+             */
+            return Array.prototype.every.call(
+                picker.querySelectorAll("ul.list-group, .fileSelector"),
+                (node) =>
+                    !node.checkVisibility({
+                        visibilityProperty: true,
+                        opacityProperty: true,
+                        contentVisibilityAuto: true
+                    })
+            );
+        }),
+        await page.evaluate(() => {
+            const picker = document.querySelector(
+                ".formio-component-attachmentPicker"
+            );
+            return picker ? picker.innerText.replace(/\s+/g, " ").trim() : "";
+        })
+    );
+
+    check(
+        "the composer shows no stray 'File Name' / 'Size' / 'Drop files' text",
+        await page.evaluate(() => {
+            const composer = document.querySelector(
+                ".formio-component-composer"
+            );
+            if (!composer) return false;
+            const text = composer.innerText || "";
+            return (
+                !/File Name/i.test(text) &&
+                !/\bSize\b/i.test(text) &&
+                !/Drop files/i.test(text)
+            );
+        }),
+        await page.evaluate(() => {
+            const composer = document.querySelector(
+                ".formio-component-composer"
+            );
+            return composer
+                ? composer.innerText.replace(/\s+/g, " ").trim().slice(0, 200)
+                : "";
+        })
+    );
+
+    check(
+        "the attach control opens Form.io's own browse affordance",
+        await page.evaluate(() => {
+            const browse = document.querySelector(
+                '.formio-component-attachmentPicker [ref="fileBrowse"]'
+            );
+            const button = document.querySelector("#sca-attach-button");
+            if (!browse || !button) return false;
+
+            let reached = false;
+            const spy = (event) => {
+                reached = true;
+                event.preventDefault();
+                event.stopImmediatePropagation();
+            };
+
+            browse.addEventListener("click", spy, true);
+            button.click();
+            browse.removeEventListener("click", spy, true);
+
+            return reached;
+        }),
+        "clicking #sca-attach-button did not reach [ref=fileBrowse]"
     );
 
     check(
         "the tray host exists and starts empty",
-        await page.locator("#sca-attachment-tray").count() === 1 &&
+        (await page.locator("#sca-attachment-tray").count()) === 1 &&
             (await page.locator(".sca-chip").count()) === 0
     );
 
@@ -343,7 +401,7 @@ async function main() {
 
     section("SCA-37 — attach a Word document");
 
-    await attachFile(page, pickerInputSelector, path.join(FIXTURES, "sample.docx"));
+    await attachFile(page, path.join(FIXTURES, "sample.docx"));
 
     await waitForChip(page, 10000);
 
@@ -592,11 +650,11 @@ async function main() {
 
     section("SCA-37 — the same file attached twice");
 
-    await attachFile(page, pickerInputSelector, path.join(FIXTURES, "sample.docx"));
+    await attachFile(page, path.join(FIXTURES, "sample.docx"));
 
     await waitForChip(page, 10000);
 
-    await attachFile(page, pickerInputSelector, path.join(FIXTURES, "sample.docx"));
+    await attachFile(page, path.join(FIXTURES, "sample.docx"));
 
     await page.waitForTimeout(500);
 
@@ -631,7 +689,7 @@ async function main() {
 
     fs.writeFileSync(bogus, "not really a zip");
 
-    await attachFile(page, pickerInputSelector, bogus);
+    await attachFile(page, bogus);
     await page.waitForTimeout(500);
 
     check(
@@ -664,7 +722,7 @@ async function main() {
 
     section("SCA-37 — encrypted PDF");
 
-    await attachFile(page, pickerInputSelector, path.join(FIXTURES, "encrypted.pdf"));
+    await attachFile(page, path.join(FIXTURES, "encrypted.pdf"));
 
     await waitForSelectorVisible(page, ".sca-chip-error", 10000);
 
@@ -680,7 +738,7 @@ async function main() {
 
     section("SCA-37 — a text-based PDF");
 
-    await attachFile(page, pickerInputSelector, path.join(FIXTURES, "simple.pdf"));
+    await attachFile(page, path.join(FIXTURES, "simple.pdf"));
 
     await waitForChip(page, 15000);
 
@@ -712,7 +770,7 @@ async function main() {
     if (!fs.existsSync(realDocPath)) {
         console.log("  SKIP  real-documentation.docx fixture not present");
     } else {
-    await attachFile(page, pickerInputSelector, realDocPath);
+    await attachFile(page, realDocPath);
 
     await waitForChip(page, 20000);
 
@@ -754,7 +812,7 @@ async function main() {
 
     section("SCA-37 — oversized document is truncated, not dropped");
 
-    await attachFile(page, pickerInputSelector, path.join(FIXTURES, "oversized.txt"));
+    await attachFile(page, path.join(FIXTURES, "oversized.txt"));
 
     await waitForChip(page, 20000);
 
@@ -826,7 +884,31 @@ async function main() {
 
     section("SCA-23 — New Chat clears attachments");
 
-    await page.click(".formio-component-newChat button");
+    check(
+        "the header no longer carries its own New Chat button",
+        await page.evaluate(() => {
+            const button = document.querySelector(
+                ".formio-component-newChat button"
+            );
+
+            return (
+                Boolean(button) &&
+                !button.checkVisibility({
+                    visibilityProperty: true,
+                    opacityProperty: true,
+                    contentVisibilityAuto: true
+                })
+            );
+        }),
+        "still visible, or the component was removed entirely"
+    );
+
+    /*
+     * Started the way a developer now starts one: the sidebar entry.
+     * The header's own button is hidden (history.css 26F2) but still
+     * present and still wired, which is what this click reaches.
+     */
+    await page.click("#sca-new-conversation");
     await page.waitForTimeout(300);
 
     check(
@@ -859,7 +941,7 @@ async function main() {
     await page.setViewportSize({ width: 390, height: 780 });
     await page.waitForTimeout(300);
 
-    await attachFile(page, pickerInputSelector, path.join(FIXTURES, "sample.docx"));
+    await attachFile(page, path.join(FIXTURES, "sample.docx"));
 
     await waitForChip(page, 10000);
 
@@ -936,8 +1018,136 @@ async function main() {
     );
 
     check(
-        "the conversations list is a real Form.io datagrid",
+        "the conversations datagrid is still present, for its behaviour",
         (await page.locator(".formio-component-conversationsGrid").count()) === 1
+    );
+
+    /*
+     * Form.io materialises one blank row for an empty datagrid whatever
+     * `defaultValue: []` says. In production that row rendered two
+     * editable text inputs and two icon buttons, 458px wide inside a
+     * 239px sidebar column. The datagrid is kept for its row buttons
+     * and hidden structurally; the visible list is our own markup.
+     */
+    check(
+        "the datagrid renders no visible chrome of its own",
+        await page.evaluate(() => {
+            const grid = document.querySelector(
+                ".formio-component-conversationsGrid"
+            );
+            if (!grid) return false;
+            return grid.getClientRects().length === 0 ||
+                grid.getBoundingClientRect().height <= 1;
+        }),
+        await page.evaluate(() => {
+            const grid = document.querySelector(
+                ".formio-component-conversationsGrid"
+            );
+            return grid
+                ? JSON.stringify(grid.getBoundingClientRect())
+                : "missing";
+        })
+    );
+
+    check(
+        "no blank phantom row is visible in the sidebar",
+        await page.evaluate(() => {
+            const inputs = document.querySelectorAll(
+                ".sca-sidebar-panel input[type='text'], .sca-sidebar-panel textarea"
+            );
+            return Array.prototype.every.call(
+                inputs,
+                (node) =>
+                    !node.checkVisibility({
+                        visibilityProperty: true,
+                        opacityProperty: true,
+                        contentVisibilityAuto: true
+                    })
+            );
+        }),
+        "an editable field is visible in the sidebar"
+    );
+
+    check(
+        "an empty conversation list renders its own empty state",
+        await page.evaluate(() => {
+            const list = document.querySelector("#sca-conversation-list");
+            if (!list) return false;
+            return (
+                list.querySelectorAll(".sca-conversation-row").length === 0 &&
+                /no conversations/i.test(list.innerText || "")
+            );
+        }),
+        await page.evaluate(() => {
+            const list = document.querySelector("#sca-conversation-list");
+            return list ? list.innerText.trim().slice(0, 120) : "#sca-conversation-list missing";
+        })
+    );
+
+    const listRendering = await page.evaluate(async () => {
+        window.__harnessSetConversations([
+            {
+                _id: "sap-aaa",
+                title: "Build a RAP service for sales orders",
+                updatedAtLabel: "2 hours ago"
+            },
+            {
+                _id: "sap-bbb",
+                title: "Clean core check on Z_MATERIAL_UPD",
+                updatedAtLabel: "yesterday"
+            }
+        ]);
+
+        await new Promise((resolve) => setTimeout(resolve, 600));
+
+        const rows = document.querySelectorAll(
+            "#sca-conversation-list .sca-conversation-row"
+        );
+
+        return {
+            count: rows.length,
+            firstTitle: rows[0] ? rows[0].innerText.trim() : "",
+            visible: rows[0] ? rows[0].getClientRects().length > 0 : false
+        };
+    });
+
+    check(
+        "conversations render as list rows from the datagrid's value",
+        listRendering.count === 2 && listRendering.visible,
+        JSON.stringify(listRendering)
+    );
+
+    check(
+        "a row shows its conversation title",
+        /RAP service for sales orders/.test(listRendering.firstTitle),
+        listRendering.firstTitle
+    );
+
+    check(
+        "opening a row clicks the datagrid's own row button",
+        await page.evaluate(() => {
+            const button = document.querySelector(
+                ".formio-component-conversationsGrid .formio-component-open button"
+            );
+            const row = document.querySelector(
+                "#sca-conversation-list .sca-conversation-row"
+            );
+            if (!button || !row) return false;
+
+            let reached = false;
+            const spy = (event) => {
+                reached = true;
+                event.preventDefault();
+                event.stopImmediatePropagation();
+            };
+
+            button.addEventListener("click", spy, true);
+            row.click();
+            button.removeEventListener("click", spy, true);
+
+            return reached;
+        }),
+        "clicking a rendered row did not reach the datagrid's open button"
     );
 
     check(

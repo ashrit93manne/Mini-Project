@@ -1,6 +1,6 @@
 # Conversation history
 
-> Code Companion v5.0.0 — controller SCA-38, backend nodes, NoSQL persistence
+> Code Companion v5.2.0 — controller SCA-38, backend nodes, NoSQL persistence
 
 A left sidebar with a "+ New Conversation" link and a scrollable list of
 past conversations. Clicking a past conversation loads it back into the
@@ -51,12 +51,35 @@ anything this script constructs and positions itself.** See
 
 ## What's declared vs. what's scripted
 
+v5.2.0 changed where the line falls. v5.0.0 let Form.io's `datagrid`
+BE the visible conversation list, styled into cards. That could not
+work: Form.io materialises one blank row for an empty datagrid whatever
+`defaultValue: []` says, so the deployed sidebar showed a phantom row of
+two editable text inputs and two icon buttons, measured 458px wide
+inside a 239px column. Its header row, its "Add Another" control and its
+inputs each have to be fought separately, and each is a different shape
+in a different Form.io template set.
+
+So the datagrid is now kept for its **behaviour** and hidden:
+
 | Declared (Form.io renders it) | Scripted (this project owns it) |
 | --- | --- |
-| `sidebarPanel` — a `container`, positioning surface only | The sidebar's open/closed state on mobile (`data-sca-sidebar-open` on `<body>`, exactly mirroring the existing `data-sca-attachments` pattern) |
-| `sidebarHeaderHtml` — an `htmlelement`, static markup | The "+ New Conversation" and refresh links inside it are plain `<button>`s whose click is delegated to **click the real Form.io button that already does the work** — `newChat` and the CSS-hidden `loadConversations` — never a from-scratch action |
-| `conversationsGrid` — a `datagrid`, with `title`/`updatedAtLabel` display columns and `open`/`delete` row-action buttons | Nothing. The list renders and re-renders through the same reactive `msg.payload.data` channel every chat reply already uses; this script never touches its rows |
-| `loadConversations` — a real `button` component, CSS-hidden (not `hidden: true`) the same way `messagesJson` etc. already are | Clicking a visible link elsewhere triggers a `.click()` on it, matching how the app already treats Enter-to-send as "click the real Send button" |
+| `sidebarPanel` — a `container`, positioning surface only | The sidebar's open/closed state on mobile (`data-sca-sidebar-open` on `<body>`) |
+| `sidebarHeaderHtml` — an `htmlelement`, static markup | The "+ New Conversation" and refresh links inside it are plain `<button>`s whose click is delegated to **click the real Form.io button that already does the work** — `newChat` and the CSS-hidden `loadConversations` |
+| `conversationListHost` — an `htmlelement` | The rows inside it. `ScaHistory.renderConversationList()` builds them from the datagrid's own value with `createElement`/`textContent` (a title is untrusted user text and must never be parsed as markup), and routes a row click to that row's real datagrid button |
+| `conversationsGrid` — a `datagrid`, hidden by structural CSS (history.css 26E). Still holds the rows and still owns the `open`/`delete` buttons wired to the backend | Nothing renders from it directly |
+| `loadConversations` and `newChat` — real `button` components, CSS-hidden (not `hidden: true`) | Clicking a visible link elsewhere triggers a `.click()` on them |
+
+Hidden means `visibility: hidden` plus a 1px clip, never `display: none`
+and never a class added at runtime: the buttons must stay rendered so
+Form.io keeps their handlers bound and `element.click()` still reaches
+them.
+
+**The header's own "New Chat" button is hidden too** (history.css 26F2).
+It duplicated the sidebar's "+ New Conversation". The component is
+untouched — "+ New Conversation" works by clicking exactly that button,
+and it is the one wired to the form node's New Chat output, so deleting
+it would take the feature with it.
 
 ## Data model
 

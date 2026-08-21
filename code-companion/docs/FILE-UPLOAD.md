@@ -1,6 +1,6 @@
 # File attachment with text extraction
 
-> Code Companion v5.0.0 — controller SCA-37 (v2)
+> Code Companion v5.2.0 — controller SCA-37 (v3)
 
 Delivers the first of the three items listed as *Planned Next Steps* in
 the Code Companion product documentation §8.2:
@@ -12,40 +12,79 @@ This version covers the unstructured half — Word, PDF and plain text.
 Structured sources are not built; the architecture is shaped so adding
 them is a small, contained change (see [Adding a format](#adding-a-format)).
 
-## Version note: why this is v2
+## Version note: why this is v3
 
-**v4.7.0 built the file picker entirely in script** — a `<button>` and
-an `<input type="file">` manufactured with `document.createElement` and
-positioned with CSS `calc()` against assumptions about the message box's
-exact DOM. It passed every local test, including a browser loading the
-literal built export, and rendered **nothing at all** when imported into
-the real platform — no error, no console warning reachable without
-opening devtools, just an absent control.
+v5.2.0 rebuilt file attachment for the second time. The short version:
+**it never worked in v5.0.0 or v5.1.0.** Not "worked but looked wrong" —
+no file was ever ingested.
 
-The same release's menu-toggle removal (SCA-36) *did* work in
-production. The difference points at the cause: SCA-36 only ever tags
-elements the platform had already rendered; the v1 picker manufactured
-new ones and guessed at their placement. One instance of that pattern
-worked in this sandbox and failed for real; a second instance (the
-conversation-history sidebar, built at the same time as this rewrite)
-would have carried the identical risk if built the same way.
+### What was wrong
 
-**v2 removes that risk for the picker.** The file input is now a
-**declared Form.io `file` component** (key: `attachmentPicker`), added
-in `tools/build_deptapp.py` exactly the way every other control on this
-screen — the send button, the message textarea — is declared. Form.io
-renders it; this script never creates it, never positions it by
-calculation, and only listens for the native `change` event bubbling up
-from whatever real `<input type="file">` that component contains. If the
-CSS restyling below doesn't match the platform's exact internal markup,
-the worst case is Form.io's own plainer default drop-zone appearance —
-still fully functional, never invisible.
+v2 declared a real Form.io `file` component, which was the right call,
+and then made two assumptions about it that are false in every Form.io
+version:
 
-See [`CHAT-HISTORY.md`](CHAT-HISTORY.md) for the full account of what
-was learned building the sidebar alongside this rewrite, including two
-real bugs the test suite caught before shipping (an invisible-input
-click-hijack and an unreachable mobile toggle) that are worth reading if
-extending either feature.
+1. **That the component contains an `<input type="file">` to listen to.**
+   It does not. `File.browseFiles()` creates an input, appends it to
+   `document.body`, clicks it, and removes it again inside its own
+   change handler. The delegated listener was written as
+
+   ```js
+   event.target.closest('.formio-component-attachmentPicker input[type="file"]')
+   ```
+
+   which can never match, because the input is never a descendant of the
+   component. Verified against the real renderer:
+   `document.querySelector('.formio-component-attachmentPicker input[type=file]')`
+   returns `null`.
+
+2. **That the component's markup could be dressed up at runtime.** The
+   browse link was relabelled and the native file list hidden by adding
+   a class from JavaScript. Form.io re-renders the component whenever
+   its value changes, and the controller runs on the form's data
+   lifecycle rather than after paint, so whether that decoration had
+   been applied at any given moment was a matter of timing. When it had
+   not, the component's stock chrome showed through — an empty
+   "File Name / Size" table above the message box and a "Drop files to
+   attach, or browse" zone lying across it, which is exactly what the
+   deployed screenshots showed.
+
+Neither was caught because `tests/harness/build-harness.js` **hand-wrote
+Form.io's markup for this component**, including an `<input type="file">`
+that production never had. Every test validated the assumptions instead
+of the platform.
+
+### What v3 does instead
+
+The harness now renders the export's real `formStructure` through the
+real Form.io renderer (`formiojs`, a devDependency), and the module
+stops touching Form.io's internals:
+
+| Concern | v3 approach |
+| --- | --- |
+| Intake | Reads the component's **value** — `{ storage, name, url: "data:…;base64,…", size, type }`, what formiojs' base64 storage provider produces. Stable across versions, template sets and re-renders. |
+| Opening the dialog | `#sca-attach-button` (plain HTML in a declared `htmlelement`) clicks Form.io's own `[ref="fileBrowse"]`. |
+| Removing a file | Clicks Form.io's own `[ref="removeLink"]`, so the component's value stays authoritative rather than shadowed by this module's state. |
+| Hiding the stock chrome | Structural CSS on `.formio-component-attachmentPicker` (attachments.css 24B) — `visibility: hidden` plus a 1px clip, never a class added at runtime. Kept rendered so its refs stay bound and `element.click()` still reaches them. |
+
+### Two real bugs this rewrite exposed
+
+Both were found against the real renderer and would have shipped:
+
+- **Attaching a file froze the page.** The controller's SCA-32
+  MutationObserver calls `sync()` on *any* DOM change in `document.body`,
+  unfiltered. `renderTray()` began with `tray.innerHTML = ""`
+  unconditionally, so every sync mutated the DOM, which triggered the
+  observer, which rendered again. Nothing was redrawing before, so it
+  stayed dormant; real Form.io redraws the file component on `setValue`,
+  which lit the loop — measured at 400+ `sync()` calls from a single
+  attach, with the main thread never yielding again. Every render path
+  is now idempotent.
+- **Only one file of several was ever released.** Form.io redraws after
+  each removal, detaching every node in a previously captured
+  `NodeList`, so clicking the rest of a stale list silently did nothing
+  and the survivors were re-ingested on the next tick. The list is
+  re-queried between removals now.
 
 ## What the developer sees
 

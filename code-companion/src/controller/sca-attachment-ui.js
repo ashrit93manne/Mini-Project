@@ -1,64 +1,104 @@
 /*
  * Code Companion — Attachment UI
  *
- * Version 2.0.0
+ * Version 3.0.0
  *
  * Owns the attached-file tray and the plumbing that carries extracted
  * text into the Form.io submission.
  *
- * Why this is v2 (read before changing the mounting strategy again)
+ * Why this is v3 (read before changing the intake strategy again)
  * -------------------------------------------------------------------
- * v1 built the file-picker trigger — a <button> plus a synthesized
- * <input type="file"> — entirely in script and appended it into the DOM
- * via querySelector + appendChild. It worked in every harness tested
- * against, including a browser loading the exact built export, and it
- * did not appear at all in the real deployment. The one thing that DID
- * keep working there was the hamburger removal (SCA-36), which proved
- * the script executes fine; the difference is that SCA-36 only ever
- * TAGS elements the platform already rendered, while v1's file picker
- * MANUFACTURED new elements and positioned them with CSS calc() against
- * assumptions about the composer's exact real DOM. One of those
- * assumptions didn't hold, and the result was silent — nothing to click,
- * nothing visibly broken either.
+ * v1 built the picker — a <button> plus a synthesized
+ * <input type="file"> — entirely in script. It worked in every harness
+ * it was tested against and did not appear at all in the real
+ * deployment.
  *
- * v2 removes that entire class of risk for the picker itself: the file
- * input is now a DECLARED Form.io `file` component (key: attachmentPicker,
- * added in build_deptapp.py), rendered by Form.io the same way the send
- * button, the message textarea and every other proven-working control on
- * this screen are rendered. This script never creates it and never
- * positions it by calculation — it only listens for a native `change`
- * event bubbling up from the real <input type="file"> that component
- * contains, exactly the way SCA-24's click handling already listens for
- * clicks on the Send button. That delegation pattern is known to work in
- * production, because Send and New Chat already depend on it.
+ * v2 replaced that with a DECLARED Form.io `file` component, which was
+ * the right move, and then made two wrong assumptions about it:
  *
- * The attachment tray (the chip list) still needs a place to render
- * rich, changing content — spinners, character counts, remove buttons —
- * that a plain Form.io field can't express. For that this script keeps
- * doing what the base controller has always done for the chat log and
- * the header: write innerHTML into a DECLARED `htmlelement` component
- * (key: attachmentTrayHost). The container's existence is guaranteed by
- * Form.io; only what fills it is script-owned, matching #sca-chat-log
- * exactly.
+ *   1. that the component contains a persistent <input type="file">
+ *      whose "change" event could be delegated from. It does not.
+ *      File.browseFiles() creates an input on document.body, clicks it,
+ *      and removes it again in its own change handler, so
+ *      `closest('.formio-component-attachmentPicker input[type=file]')`
+ *      matches nothing in any Form.io version. No file was ever
+ *      ingested — the feature was completely dead in production.
+ *   2. that the component's markup could be dressed up at runtime —
+ *      relabelling its browse link, adding a class to hide its file
+ *      list. Form.io re-renders the component whenever its value
+ *      changes, and the controller runs on the form's data lifecycle
+ *      rather than after paint, so whether that decoration was applied
+ *      at any moment was a matter of timing. When it was not, the stock
+ *      chrome showed through: an empty "File Name / Size" table above
+ *      the message box and a "Drop files to attach, or browse" zone
+ *      across it.
  *
- * If a chip's "remove" affordance or the counter beside the prompt
- * budget doesn't render pixel-perfect on some unforeseen layout, the
- * degraded form is still a working, if plainer, Form.io file field —
- * never nothing.
+ * Neither was caught because the test harness hand-wrote Form.io's
+ * markup for this component, so every test validated the assumptions
+ * instead of the platform. The harness now renders the real Form.io.
+ *
+ * v3 stops touching Form.io's internals entirely:
+ *
+ *   - Intake reads the component's VALUE (ingestPickerValue), which is
+ *     the platform's actual contract: an array of
+ *     { storage, name, url: "data:...;base64,...", size, type } objects
+ *     produced by formiojs' base64 storage provider.
+ *   - The component is hidden by structural CSS keyed on its own stable
+ *     class (attachments.css 24B), with no dependency on any script
+ *     having run.
+ *   - The visible control is #sca-attach-button, plain HTML in a
+ *     declared htmlelement — the one thing that has always rendered
+ *     exactly as authored in the real deployment. It opens the dialog
+ *     by clicking Form.io's own [ref="fileBrowse"], and removing a chip
+ *     clicks Form.io's own [ref="removeLink"], so the component's value
+ *     stays authoritative rather than shadowed.
+ *
+ * One more thing this module must respect: the controller's SCA-32
+ * MutationObserver calls sync() on ANY DOM change anywhere in
+ * document.body, unfiltered. Every render path here is therefore
+ * idempotent — no change, no mutation, no observer callback. Skipping
+ * that made attaching a file freeze the page outright (400+ sync()
+ * calls from a single setValue); see renderTray().
  */
 
 var ScaAttachmentUi = (function buildScaAttachmentUi() {
     "use strict";
 
-    var UI_VERSION = "2.0.0";
+    var UI_VERSION = "3.0.0";
 
     var SELECTORS = {
         pickerRoot: ".formio-component-attachmentPicker",
-        pickerInput: '.formio-component-attachmentPicker input[type="file"]',
+        /*
+         * Form.io's own browse trigger. Clicking it is what opens the
+         * file dialog — File.browseFiles() then creates a transient
+         * <input type="file"> on document.body, clicks it, and removes
+         * it again inside its own change handler.
+         *
+         * v2 listened for that input's change event via
+         * `closest('.formio-component-attachmentPicker input[type=file]')`,
+         * which cannot match: the input is never a descendant of the
+         * component. That is why no file was ever ingested in
+         * production. There is no selector for it here now, because
+         * this module no longer tries to observe it at all — see
+         * AUI-03's ingestPickerValue().
+         */
+        pickerBrowse:
+            '.formio-component-attachmentPicker [ref="fileBrowse"],' +
+            ".formio-component-attachmentPicker .fileSelector a",
+        pickerRemoveLinks:
+            '.formio-component-attachmentPicker [ref="removeLink"]',
+        attachButton: "#sca-attach-button",
         trayHost: "#sca-attachment-tray",
         budgetHost: "#sca-prompt-budget",
         attachmentCounter: "#sca-attachment-counter"
     };
+
+    /*
+     * Where Form.io keeps the picker's value. `composer` and
+     * `attachmentBar` are `container` components, and containers nest
+     * their children's data — verified against the live renderer.
+     */
+    var PICKER_PATH = ["composer", "attachmentBar", "attachmentPicker"];
 
     var SPINNER_ICON =
         '<span class="sca-chip-spinner" aria-hidden="true"></span>';
@@ -71,10 +111,14 @@ var ScaAttachmentUi = (function buildScaAttachmentUi() {
         busy: 0,
         notice: "",
         /*
-         * Guards against attaching the delegated change listener more
-         * than once across repeated mount() calls.
+         * Keys (name|size) of the picker entries already handed to
+         * addFiles(), so a value that survives across sync ticks is
+         * ingested exactly once.
          */
-        listenerAttached: false
+        pickerKeys: [],
+
+        /* Last content rendered into the tray; see renderTray(). */
+        traySignature: null
     };
 
     /* =========================================================
@@ -112,132 +156,257 @@ var ScaAttachmentUi = (function buildScaAttachmentUi() {
         var pickerRoot = find(SELECTORS.pickerRoot);
         var trayHost = find(SELECTORS.trayHost);
 
-        attachChangeListener();
         mountCounter();
-
-        if (pickerRoot) {
-            decoratePicker(pickerRoot);
-        }
-
         renderTray();
 
         return Boolean(pickerRoot) && Boolean(trayHost);
     }
 
-    /*
-     * Attached once, to `document`, and never removed for the life of
-     * the page — the same lifetime as SCA-31's click/keydown listeners.
-     * Delegation means it keeps working across every Form.io re-render
-     * without needing to be re-attached to a fresh element each time.
-     */
-    function attachChangeListener() {
-        if (state.listenerAttached) {
-            return;
+    /* =========================================================
+     * AUI-02b — INGESTION FROM THE COMPONENT VALUE
+     *
+     * The platform's contract for a `file` component is its VALUE, not
+     * its DOM. With storage "base64", formiojs' base64 provider
+     * resolves each picked file to
+     *
+     *   { storage: "base64", name, url: "data:<mime>;base64,<...>",
+     *     size, type }
+     *
+     * and puts it in the submission. Reading that is stable across
+     * Form.io versions, template sets, and re-renders, none of which is
+     * true of the markup around it.
+     * ========================================================= */
+
+    function currentPickerValue() {
+        var node = controller ? controller.latestFormData : null;
+
+        for (var index = 0; index < PICKER_PATH.length; index += 1) {
+            if (!node || typeof node !== "object") {
+                return [];
+            }
+
+            node = node[PICKER_PATH[index]];
         }
 
-        document.addEventListener(
-            "change",
-            function (event) {
-                var input =
-                    event.target instanceof Element
-                        ? event.target.closest(SELECTORS.pickerInput)
-                        : null;
+        return Array.isArray(node) ? node : [];
+    }
 
-                if (!input) {
-                    return;
-                }
+    function pickerKeyOf(entry) {
+        return String(entry.name || "") + "|" + (Number(entry.size) || 0);
+    }
 
-                var files = Array.prototype.slice.call(input.files || []);
+    /* "data:text/plain;base64,AAAA" -> Uint8Array */
+    function bytesFromDataUrl(url) {
+        var comma = String(url || "").indexOf(",");
 
-                if (files.length) {
-                    addFiles(files);
-                }
+        if (comma < 0) {
+            return null;
+        }
 
-                /*
-                 * Form.io owns this input's value; clearing it here would
-                 * fight its own state management. Duplicate detection in
-                 * addFiles() is what makes re-picking the same file safe,
-                 * not clearing the input.
-                 */
-            },
-            true
-        );
+        var binary;
 
-        state.listenerAttached = true;
+        try {
+            binary = window.atob(String(url).slice(comma + 1));
+        } catch (error) {
+            return null;
+        }
 
-        log("info", "change-listener-attached", { version: UI_VERSION });
+        var bytes = new Uint8Array(binary.length);
+
+        for (var index = 0; index < binary.length; index += 1) {
+            bytes[index] = binary.charCodeAt(index);
+        }
+
+        return bytes;
     }
 
     /*
-     * Form.io's default file component renders a full drop-zone with
-     * instructional text ("Drop files to attach, or Browse"), which is
-     * correct but visually heavy for a composer toolbar. This trims the
-     * wording to something compact WITHOUT touching how the element
-     * works — it only rewrites text content Form.io already rendered,
-     * the same low-risk category of change as SCA-36's tagging.
-     *
-     * Guarded so it only runs once per real DOM node (Form.io may
-     * re-render this component on state changes, producing a fresh
-     * node each time, which naturally re-triggers the trim).
+     * Turns the picker's value into the File objects the rest of this
+     * module already knows how to handle, so everything downstream of
+     * addFiles() — extraction, budget, truncation, chips — is reached
+     * by exactly the code path it always was.
      */
-    function decoratePicker(pickerRoot) {
-        if (pickerRoot.getAttribute("data-sca-decorated") === "true") {
-            return;
-        }
+    function ingestPickerValue() {
+        var entries = currentPickerValue();
+        var seen = [];
+        var fresh = [];
 
-        var browseLink = pickerRoot.querySelector(
-            'a[ref="fileBrowse"], .fileSelector a, .browse'
-        );
+        var duplicates = [];
+        var duplicateIndices = [];
 
-        var dropZone = pickerRoot.querySelector(
-            '[ref="fileDrop"], .fileSelector'
-        );
+        entries.forEach(function (entry, index) {
+            if (!entry || typeof entry !== "object") {
+                return;
+            }
 
-        if (browseLink) {
-            browseLink.textContent = "Attach files";
-        }
+            var key = pickerKeyOf(entry);
 
-        if (dropZone && !browseLink) {
             /*
-             * Some Form.io templates fold the browse trigger and the
-             * drop-zone label into one text node rather than a separate
-             * <a>. Falling back to relabelling the whole zone keeps this
-             * useful even if that's the shape encountered here.
+             * The same file picked twice appears twice in the value.
+             * addFiles() would have explained that, but it is never
+             * reached for an entry whose key is already ingested, so the
+             * explanation is given here instead of silently doing
+             * nothing.
              */
-            var existingLink = dropZone.querySelector("a");
+            if (seen.indexOf(key) !== -1) {
+                duplicates.push(String(entry.name || ""));
+                duplicateIndices.push(index);
+                return;
+            }
 
-            if (existingLink) {
-                existingLink.textContent = "Attach files";
+            seen.push(key);
+
+            if (state.pickerKeys.indexOf(key) !== -1) {
+                return;
+            }
+
+            var bytes = bytesFromDataUrl(entry.url);
+
+            if (!bytes) {
+                log("error", "picker-value-undecodable", { name: entry.name });
+                return;
+            }
+
+            state.pickerKeys.push(key);
+
+            fresh.push(
+                new File([bytes], String(entry.name || "attachment"), {
+                    type: String(entry.type || "application/octet-stream")
+                })
+            );
+        });
+
+        /*
+         * An entry that has left the value (Form.io's own remove control,
+         * or a reset) must stop counting as ingested, or re-attaching the
+         * same file later would be silently ignored.
+         */
+        state.pickerKeys = state.pickerKeys.filter(function (key) {
+            return seen.indexOf(key) !== -1;
+        });
+
+        if (fresh.length) {
+            log("info", "picker-value-ingested", { count: fresh.length });
+            addFiles(fresh);
+        } else if (duplicates.length) {
+            setNotice(
+                duplicates.length === 1
+                    ? duplicates[0] + " is already attached."
+                    : "Those files are already attached."
+            );
+
+            renderTray();
+
+            /*
+             * Hand the redundant copy back to Form.io. Without this the
+             * duplicate stays in the component's value forever, this
+             * branch runs again on every sync tick, and the notice chip
+             * can never be cleared by anything the developer does.
+             */
+            duplicateIndices
+                .slice()
+                .reverse()
+                .forEach(function (index) {
+                    releasePickerFileAt(index);
+                });
+        }
+    }
+
+    /*
+     * Removes one entry by position. Re-queries rather than holding a
+     * NodeList, for the reason given on releaseAllPickerFiles().
+     */
+    function releasePickerFileAt(index) {
+        var links = document.querySelectorAll(SELECTORS.pickerRemoveLinks);
+
+        if (links[index]) {
+            links[index].click();
+        }
+    }
+
+    /*
+     * Hands a file back to Form.io by clicking its own remove control,
+     * so the component's value stays authoritative rather than being
+     * shadowed by this module's state.
+     */
+    function releasePickerFile(name, bytes) {
+        var entries = currentPickerValue();
+        var index = -1;
+
+        for (var i = 0; i < entries.length; i += 1) {
+            if (
+                String(entries[i].name || "") === String(name) &&
+                (Number(entries[i].size) || 0) === (Number(bytes) || 0)
+            ) {
+                index = i;
+                break;
             }
         }
 
-        /*
-         * Hide Form.io's own post-selection file list: the richer chip
-         * tray below is the single source of truth for what's attached,
-         * so showing both would be redundant and could drift out of
-         * sync (e.g. Form.io shows a file our own extraction rejected).
-         */
-        var nativeList = pickerRoot.querySelector(
-            '[ref="fileList"], ul.list-group'
-        );
-
-        if (nativeList) {
-            nativeList.classList.add("sca-native-file-list-hidden");
+        if (index < 0) {
+            return;
         }
 
-        pickerRoot.setAttribute("data-sca-decorated", "true");
-        pickerRoot.setAttribute(
-            "title",
-            "Attach a file (" +
-                (engine
-                    ? engine.manager
-                          .supportedExtensionList()
-                          .join(", ")
-                          .toUpperCase()
-                          .replace(/\./g, "")
-                    : "DOCX, PDF, TXT, MD") +
-                ")"
-        );
+        var links = document.querySelectorAll(SELECTORS.pickerRemoveLinks);
+
+        if (links[index]) {
+            links[index].click();
+        }
+    }
+
+    /*
+     * Form.io redraws the component after each removal, which detaches
+     * every node in a previously captured NodeList — clicking the rest
+     * of a stale list silently does nothing, so a first attempt at this
+     * removed only one file of several and the survivors were then
+     * re-ingested on the next tick. The list is re-queried each time,
+     * and the loop stops as soon as a pass fails to remove anything.
+     *
+     * pickerKeys is deliberately NOT reset here: ingestPickerValue()
+     * prunes keys that are no longer in the value, so a removal that
+     * did not take leaves its key in place and the file is not
+     * re-ingested.
+     */
+    function releaseAllPickerFiles() {
+        var previous = -1;
+
+        for (var guard = 0; guard < 50; guard += 1) {
+            var links = document.querySelectorAll(SELECTORS.pickerRemoveLinks);
+
+            if (!links.length) {
+                return;
+            }
+
+            if (links.length === previous) {
+                log("error", "picker-release-stalled", {
+                    remaining: links.length
+                });
+
+                return;
+            }
+
+            previous = links.length;
+
+            links[links.length - 1].click();
+        }
+    }
+
+    /*
+     * Opens the platform's own file dialog. The click must originate
+     * from the user's click on our button so the browser's user
+     * activation carries through to the transient input Form.io opens.
+     */
+    function openPicker() {
+        var browse = find(SELECTORS.pickerBrowse);
+
+        if (!browse) {
+            log("error", "picker-browse-missing", {});
+            return false;
+        }
+
+        browse.click();
+
+        return true;
     }
 
     /*
@@ -490,12 +659,64 @@ var ScaAttachmentUi = (function buildScaAttachmentUi() {
      * AUI-04 — TRAY RENDERING
      * ========================================================= */
 
+    /*
+     * Identifies what the tray should currently show. Cheap to compute
+     * and compared before any DOM is touched — see renderTray().
+     */
+    function traySignature() {
+        return (
+            state.records
+                .map(function (record) {
+                    return [
+                        record.id,
+                        record.status,
+                        record.name,
+                        record.bytes,
+                        (record.text || "").length,
+                        record.truncated ? 1 : 0
+                    ].join("|");
+                })
+                .join("~") +
+            "!" +
+            String(state.notice || "")
+        );
+    }
+
+    /*
+     * This used to begin `tray.innerHTML = ""` unconditionally, and is
+     * called from sync() — which the controller's SCA-32 MutationObserver
+     * runs on ANY DOM change anywhere in document.body, unfiltered. So
+     * every render mutated the DOM, which triggered the observer, which
+     * rendered again: a feedback loop that starves the main thread.
+     *
+     * It stayed dormant only because nothing else was redrawing. Real
+     * Form.io redraws the file component whenever its value changes, so
+     * attaching a file lit the loop and froze the page — reproduced
+     * against the real renderer as 400+ sync() calls from one setValue.
+     *
+     * The fix is to make rendering idempotent: no change, no mutation,
+     * no observer callback. The child count is checked too, so a Form.io
+     * redraw that wipes the tray still repaints it.
+     */
     function renderTray() {
         var tray = find(SELECTORS.trayHost);
 
         if (!tray) {
             return;
         }
+
+        var signature = traySignature();
+        var expected = state.records.length + (state.notice ? 1 : 0);
+
+        if (
+            state.traySignature === signature &&
+            tray.childElementCount === expected
+        ) {
+            renderCounter();
+            return;
+        }
+
+        state.traySignature = signature;
 
         tray.innerHTML = "";
 
@@ -516,9 +737,12 @@ var ScaAttachmentUi = (function buildScaAttachmentUi() {
          * has room without the message box or the send button moving.
          */
         if (document.body) {
-            if (hasContent) {
+            var present =
+                document.body.getAttribute("data-sca-attachments") === "true";
+
+            if (hasContent && !present) {
                 document.body.setAttribute("data-sca-attachments", "true");
-            } else {
+            } else if (!hasContent && present) {
                 document.body.removeAttribute("data-sca-attachments");
             }
         }
@@ -645,15 +869,28 @@ var ScaAttachmentUi = (function buildScaAttachmentUi() {
             })
         );
 
+        /*
+         * Assigning textContent replaces child nodes even when the text
+         * is identical, which is a DOM mutation the SCA-32 observer
+         * reacts to. Compare first — see renderTray() above.
+         */
         if (!summary.usableFiles) {
-            counter.hidden = true;
-            counter.textContent = "";
+            if (!counter.hidden) {
+                counter.hidden = true;
+            }
+
+            if (counter.textContent !== "") {
+                counter.textContent = "";
+            }
+
             return;
         }
 
-        counter.hidden = false;
+        if (counter.hidden) {
+            counter.hidden = false;
+        }
 
-        counter.textContent =
+        var text =
             " · " +
             summary.usableFiles +
             (summary.usableFiles === 1 ? " file" : " files") +
@@ -661,6 +898,10 @@ var ScaAttachmentUi = (function buildScaAttachmentUi() {
             summary.characters.toLocaleString() +
             " chars attached" +
             (summary.truncated ? " (truncated)" : "");
+
+        if (counter.textContent !== text) {
+            counter.textContent = text;
+        }
 
         counter.classList.toggle("is-near-limit", summary.nearLimit);
         counter.classList.toggle("is-at-limit", summary.atLimit);
@@ -792,6 +1033,14 @@ var ScaAttachmentUi = (function buildScaAttachmentUi() {
         state.records = [];
         state.busy = 0;
 
+        /*
+         * The picker's value is released too. It is not "visual": leaving
+         * the base64 payloads in the component would resend every
+         * document with the next message and re-ingest them on the next
+         * sync tick.
+         */
+        releaseAllPickerFiles();
+
         setNotice("");
         renderTray();
         refreshComposer();
@@ -822,13 +1071,36 @@ var ScaAttachmentUi = (function buildScaAttachmentUi() {
             return false;
         }
 
+        if (target.closest(SELECTORS.attachButton)) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            openPicker();
+
+            return true;
+        }
+
         var remove = target.closest("[data-attachment-remove]");
 
         if (remove) {
             event.preventDefault();
             event.stopPropagation();
 
-            removeRecord(remove.getAttribute("data-attachment-remove"));
+            var id = remove.getAttribute("data-attachment-remove");
+            var record = state.records[indexOf(id)];
+
+            /*
+             * Give the file back to Form.io before dropping our own
+             * record, so its value never keeps a document the developer
+             * has just removed — otherwise it would ride along in every
+             * later submission, and re-attaching the same file would be
+             * silently ignored as already present.
+             */
+            if (record) {
+                releasePickerFile(record.name, record.bytes);
+            }
+
+            removeRecord(id);
 
             return true;
         }
@@ -848,13 +1120,18 @@ var ScaAttachmentUi = (function buildScaAttachmentUi() {
         refreshComposer();
     }
 
-    /* Called from the host controller's periodic sync. */
+    /*
+     * Called from the host controller's periodic sync and after every
+     * form-data change — which is exactly when a newly picked file
+     * appears in the component's value.
+     */
     function sync() {
         if (!engine) {
             return;
         }
 
         mount();
+        ingestPickerValue();
         refreshComposer();
     }
 

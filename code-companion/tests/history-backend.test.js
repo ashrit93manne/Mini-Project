@@ -29,7 +29,7 @@ const EXPORT = path.join(
     __dirname,
     "..",
     "build",
-    "aXet.SAP__Code_Agents_v5.0.0_export.deptapp"
+    "aXet.SAP__Code_Companion_v5.2.0_export.deptapp"
 );
 
 let passed = 0;

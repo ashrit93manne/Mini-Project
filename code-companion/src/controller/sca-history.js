@@ -32,15 +32,23 @@
 var ScaHistory = (function buildScaHistory() {
     "use strict";
 
-    var HISTORY_VERSION = "1.0.0";
+    var HISTORY_VERSION = "2.0.0";
 
     var SELECTORS = {
         newConversationLink: "#sca-new-conversation",
         refreshLink: "#sca-history-refresh",
         sidebarToggle: "#sca-sidebar-toggle",
         newChatButton: ".formio-component-newChat button",
-        loadConversationsButton: ".formio-component-loadConversations button"
+        loadConversationsButton: ".formio-component-loadConversations button",
+        listHost: "#sca-conversation-list",
+        gridRows: ".formio-component-conversationsGrid tbody tr"
     };
+
+    /*
+     * Where Form.io keeps the datagrid's value. `sidebarPanel` is a
+     * `container`, and containers nest their children's data.
+     */
+    var GRID_PATH = ["sidebarPanel", "conversationsGrid"];
 
     var controller = null;
     var triggeredInitialLoad = false;
@@ -181,23 +189,220 @@ var ScaHistory = (function buildScaHistory() {
             return true;
         }
 
-        /*
-         * A row's own "open" click should also close the sidebar on a
-         * narrow screen, the same way choosing a page from a mobile nav
-         * menu closes that menu — otherwise the loaded conversation is
-         * hidden behind the panel the user just used to reach it.
-         */
-        if (
-            target.closest(".formio-component-conversationsGrid .formio-component-open")
-        ) {
-            window.setTimeout(function () {
-                if (window.matchMedia && window.matchMedia("(max-width: 900px)").matches) {
-                    setSidebarOpen(false);
-                }
-            }, 0);
+        var remove = target.closest("[data-sca-conversation-delete]");
+
+        if (remove) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            clickRowButton(
+                remove.getAttribute("data-sca-conversation-delete"),
+                "delete"
+            );
+
+            return true;
+        }
+
+        var open = target.closest("[data-sca-conversation-open]");
+
+        if (open) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            clickRowButton(
+                open.getAttribute("data-sca-conversation-open"),
+                "open"
+            );
+
+            /*
+             * On a narrow screen the sidebar is an overlay, so choosing
+             * a conversation should close it — otherwise the one just
+             * loaded is hidden behind the panel used to reach it.
+             */
+            if (
+                window.matchMedia &&
+                window.matchMedia("(max-width: 900px)").matches
+            ) {
+                setSidebarOpen(false);
+            }
+
+            return true;
         }
 
         return false;
+    }
+
+    /* =========================================================
+     * HIS-03b — THE VISIBLE CONVERSATION LIST
+     *
+     * The datagrid holds the rows and owns the buttons wired to the
+     * backend; it is hidden (history.css 26E). This renders what the
+     * developer sees, from the datagrid's own value, and routes a click
+     * on a rendered row to that row's real button — the same technique
+     * "+ New Conversation" already uses to reach the real New Chat
+     * button, which is the one pattern that has always worked in the
+     * real deployment.
+     * ========================================================= */
+
+    function conversationRows() {
+        var node = controller ? controller.latestFormData : null;
+
+        for (var index = 0; index < GRID_PATH.length; index += 1) {
+            if (!node || typeof node !== "object") {
+                return [];
+            }
+
+            node = node[GRID_PATH[index]];
+        }
+
+        if (!Array.isArray(node)) {
+            return [];
+        }
+
+        /*
+         * Form.io materialises one blank row for an empty datagrid
+         * whatever `defaultValue: []` says, and that row arrives here
+         * looking like a conversation with no title. Rendering it gave
+         * the deployed sidebar a phantom "Untitled conversation" entry
+         * pointing at nothing.
+         */
+        return node.filter(function (row) {
+            if (!row || typeof row !== "object") {
+                return false;
+            }
+
+            return Boolean(
+                String(row._id || "").trim() || String(row.title || "").trim()
+            );
+        });
+    }
+
+    function listSignature(rows) {
+        return rows
+            .map(function (row) {
+                return (
+                    String((row && row.title) || "") +
+                    "\u0001" +
+                    String((row && row.updatedAtLabel) || "")
+                );
+            })
+            .join("\u0002");
+    }
+
+    /*
+     * Called on every sync tick, so it must be cheap when nothing has
+     * changed: re-rendering unconditionally would throw away the row
+     * the pointer is over several times a second.
+     */
+    function renderConversationList() {
+        var host = find(SELECTORS.listHost);
+
+        if (!host) {
+            return;
+        }
+
+        var rows = conversationRows();
+        var signature = listSignature(rows);
+
+        if (host.getAttribute("data-sca-list-signature") === signature) {
+            return;
+        }
+
+        host.setAttribute("data-sca-list-signature", signature);
+
+        while (host.firstChild) {
+            host.removeChild(host.firstChild);
+        }
+
+        if (!rows.length) {
+            var empty = document.createElement("p");
+
+            empty.className = "sca-conversation-empty";
+            empty.textContent = "No conversations yet.";
+
+            host.appendChild(empty);
+
+            return;
+        }
+
+        rows.forEach(function (row, index) {
+            host.appendChild(buildConversationItem(row, index));
+        });
+
+        log("info", "conversation-list-rendered", { count: rows.length });
+    }
+
+    /*
+     * Built with createElement/textContent rather than innerHTML: a
+     * conversation's title is the first line of whatever the developer
+     * typed, so it is untrusted text and must never be parsed as markup.
+     */
+    function buildConversationItem(row, index) {
+        var item = document.createElement("div");
+
+        item.className = "sca-conversation-item";
+
+        var open = document.createElement("button");
+
+        open.type = "button";
+        open.className = "sca-conversation-row";
+        open.setAttribute("data-sca-conversation-open", String(index));
+
+        var title = document.createElement("span");
+
+        title.className = "sca-conversation-title";
+        title.textContent =
+            String((row && row.title) || "").trim() || "Untitled conversation";
+
+        var when = document.createElement("span");
+
+        when.className = "sca-conversation-time";
+        when.textContent = String((row && row.updatedAtLabel) || "");
+
+        open.appendChild(title);
+        open.appendChild(when);
+
+        var remove = document.createElement("button");
+
+        remove.type = "button";
+        remove.className = "sca-conversation-delete";
+        remove.setAttribute("data-sca-conversation-delete", String(index));
+        remove.setAttribute("aria-label", "Delete this conversation");
+        remove.title = "Delete this conversation";
+        remove.textContent = "\u2715";
+
+        item.appendChild(open);
+        item.appendChild(remove);
+
+        return item;
+    }
+
+    /* Clicks the datagrid's own button for one row. */
+    function clickRowButton(index, kind) {
+        var rows = document.querySelectorAll(SELECTORS.gridRows);
+        var row = rows[Number(index)];
+
+        if (!row) {
+            log("error", "grid-row-missing", { index: index, kind: kind });
+            return false;
+        }
+
+        var button = row.querySelector(
+            ".formio-component-" + kind + " button"
+        );
+
+        if (!button) {
+            log("error", "grid-row-button-missing", {
+                index: index,
+                kind: kind
+            });
+
+            return false;
+        }
+
+        button.click();
+
+        return true;
     }
 
     /* =========================================================
@@ -221,9 +426,16 @@ var ScaHistory = (function buildScaHistory() {
         }
     }
 
+    /* Called from the host controller's periodic sync. */
+    function sync() {
+        renderConversationList();
+    }
+
     return {
         version: HISTORY_VERSION,
         init: init,
+        sync: sync,
+        renderConversationList: renderConversationList,
         handleClick: handleClick,
         startNewConversation: startNewConversation,
         refreshConversationList: refreshConversationList,

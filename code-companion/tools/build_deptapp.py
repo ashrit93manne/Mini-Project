@@ -21,10 +21,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from conversation_history import (  # noqa: E402
-    SIDEBAR_TOGGLE_HTML,
-    add_conversation_history,
-)
+from conversation_history import SIDEBAR_TOGGLE_HTML  # noqa: E402
+from ui_v52 import reshape_ui  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -34,12 +32,20 @@ FORM_NODE_ID = "21d415924e0e4841"
 UI_TAB_ID = "cab2b2152508727e"
 BACKEND_TAB_ID = "6a7c6094850c144e"
 
-NEW_VERSION_ALIAS = "v5.0.0"
+NEW_VERSION_ALIAS = "v5.2.0"
 NEW_VERSION_MESSAGE = (
-    "Code Companion - native Form.io file picker (replacing the "
-    "injected paperclip), persistent conversation history with a "
-    "sidebar, and the v4.7.0 menu-toggle removal / attachment "
-    "extraction changes"
+    "Code Companion v5.2.0 - working file attachment and a clean chat "
+    "surface. The Form.io file component is now read through its VALUE "
+    "(base64) instead of a change event on an input Form.io never "
+    "renders, which is why upload did nothing in v5.0.0/v5.1.0. The "
+    "file component and the conversations datagrid are hidden by "
+    "structural CSS and driven through their own controls, so their "
+    "stock chrome ('File Name / Size', 'Drop files to attach', a blank "
+    "datagrid row) no longer shows through the composer and sidebar. "
+    "The visible attach control and conversation list are plain HTML in "
+    "declared htmlelements. The duplicate header New Chat button is "
+    "hidden in favour of the sidebar's New Conversation. All v5.1.0 RAG "
+    "backend nodes are carried through unchanged."
 )
 
 CONTROLLER_VERSION_OLD = '"5.0.1"'
@@ -567,11 +573,18 @@ def patch_controller(source):
         "    this.render(false);\n"
         "\n"
         "    /*\n"
-        "     * Form.io re-renders the composer on state changes, which\n"
-        "     * removes the attachment control; this puts it back.\n"
+        "     * Both modules read state that only exists on the form's\n"
+        "     * data: SCA-37 ingests files from the picker component's\n"
+        "     * value, and SCA-38 renders the conversation list from the\n"
+        "     * datagrid's. This tick is when a change in either becomes\n"
+        "     * visible.\n"
         "     */\n"
         '    if (typeof ScaAttachmentUi !== "undefined") {\n'
         "      ScaAttachmentUi.sync();\n"
+        "    }\n"
+        "\n"
+        '    if (typeof ScaHistory !== "undefined" && ScaHistory.sync) {\n'
+        "      ScaHistory.sync();\n"
         "    }\n",
         "P13 sync hook",
     )
@@ -1232,59 +1245,92 @@ def patch_clear_conversation(func):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--base", required=True)
+    parser.add_argument(
+        "--base",
+        required=True,
+        help=(
+            "the export to build ON: v5.1.0, which carries the RAG "
+            "backend nodes and the v5.0.0 component tree"
+        ),
+    )
+    parser.add_argument(
+        "--pristine",
+        required=True,
+        help=(
+            "the untouched v4.6.2 export, used only as the source of the "
+            "original controller script and stylesheet that the anchored "
+            "patches below are written against"
+        ),
+    )
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
 
     with open(args.base, encoding="utf8") as handle:
         export = json.load(handle)
 
+    with open(args.pristine, encoding="utf8") as handle:
+        pristine = json.load(handle)
+
     flows = export["flowsData"]["flows"]
     by_id = {node["id"]: node for node in flows}
-    by_name = {}
-
-    for node in flows:
-        by_name.setdefault(node.get("name"), node)
 
     app = by_id[APP_NODE_ID]
     form = by_id[FORM_NODE_ID]
 
-    # 1. Controller
-    controller_component = None
+    pristine_by_id = {
+        node["id"]: node for node in pristine["flowsData"]["flows"]
+    }
+
+    pristine_app = pristine_by_id[APP_NODE_ID]
+    pristine_form = pristine_by_id[FORM_NODE_ID]
+
+    # =========================================================
+    # Why the build has two inputs
+    #
+    # The anchored patches in this file are written against the
+    # ORIGINAL v4.6.2 controller and stylesheet. Re-applying them to an
+    # export that already carries them would fail (or, worse, apply
+    # twice), so the controller and stylesheet are assembled fresh from
+    # the pristine copy and then REPLACED wholesale in the v5.1.0 base.
+    #
+    # That is safe to do because v5.1.0's user-interface layer was
+    # verified byte-for-byte identical to v5.0.0's — the release added
+    # only backend flow nodes. Everything v5.1.0 uniquely contains (the
+    # RAG ingestion/retrieval nodes and their wiring, plus the already
+    # patched Validate/Extract/Clear function bodies) is carried through
+    # untouched, which is exactly what a source-driven rebuild must not
+    # lose.
+    # =========================================================
+
+    pristine_controller = None
+
+    for component in pristine_form["formStructure"]["components"]:
+        if component.get("key") == "serverSideJavaScript":
+            pristine_controller = component["content"]
+            break
+
+    if pristine_controller is None:
+        raise PatchError("pristine form: serverSideJavaScript not found")
+
+    # 1. Controller — assembled from the pristine script, then installed.
+    controller_source = patch_controller(pristine_controller)
 
     for component in form["formStructure"]["components"]:
         if component.get("key") == "serverSideJavaScript":
-            controller_component = component
+            component["content"] = controller_source
+            component["data"]["content"] = controller_source
             break
-
-    if controller_component is None:
+    else:
         raise PatchError("form: serverSideJavaScript component not found")
 
-    controller_source = patch_controller(controller_component["content"])
+    # 2. Stylesheet — same treatment.
+    app["customCSS"] = patch_css(pristine_app["customCSS"])
 
-    # 2. Form
-    patch_form(form, controller_source)
+    # 3. Presentation. No buttons are added, so the form node's
+    #    outputs/wires are untouched; reshape_ui asserts that.
+    reshape_ui(export, FORM_NODE_ID)
 
-    # 3. CSS
-    app["customCSS"] = patch_css(app["customCSS"])
-
-    # 4. Backend
-    validate_node = by_name["Validate + Build SAP Agent Prompt"]
-    validate_node["func"] = patch_validate_build_prompt(validate_node["func"])
-
-    extract_node = by_name["Extract Response + Update Chat"]
-    extract_node["func"] = patch_extract_response(extract_node["func"])
-
-    clear_node = by_name["Clear Conversation"]
-    clear_node["func"] = patch_clear_conversation(clear_node["func"])
-
-    # 5. Conversation history — persistence, sidebar, and the backend
-    #    wiring connecting them. Adds new graph nodes rather than
-    #    patching existing ones, so it runs after every other patch has
-    #    already located and edited its own anchors.
-    add_conversation_history(export, FORM_NODE_ID, UI_TAB_ID, BACKEND_TAB_ID)
-
-    # 6. Version
+    # 4. Version
     info = export["info"]["deptAppVersionInfo"]
     info["alias"] = NEW_VERSION_ALIAS
     info["descriptionMessage"] = NEW_VERSION_MESSAGE
@@ -1299,6 +1345,7 @@ def main():
     print(f"built {args.out} ({size:,} bytes)")
     print(f"  controller script : {len(controller_source):,} chars")
     print(f"  application CSS   : {len(app['customCSS']):,} chars")
+    print(f"  flow nodes carried: {len(flows)}")
     print(f"  version alias     : {NEW_VERSION_ALIAS}")
 
 

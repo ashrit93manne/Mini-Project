@@ -1,15 +1,35 @@
 /*
  * Builds tests/harness/index.html from the BUILT .deptapp.
  *
- * The point is that the harness runs exactly the script and stylesheet
- * that ship inside the export — not the sources they were assembled
- * from — so the browser test covers the build step as well as the code.
+ * The harness renders the export's real `formStructure` through the real
+ * Form.io renderer (formiojs, a devDependency). Nothing about the form's
+ * DOM is written by hand here.
  *
- * The surrounding page reproduces the DOM the application actually runs
- * in: the Form.io wrapper classes, the composer with its textarea and
- * send button, the hidden state fields, the prompt-budget block, and a
- * platform header carrying a hamburger control of the kind the shell
- * renders.
+ * That is a deliberate correction. Until v5.2.0 this file hand-authored
+ * an approximation of Form.io's markup for the `file` and `datagrid`
+ * components, and every stylesheet rule and controller routine aimed at
+ * those components was written and validated against that approximation.
+ * The approximation was wrong in ways that mattered:
+ *
+ *   - it gave the file component a persistent <input type="file">.
+ *     Real Form.io has none: File.browseFiles() creates a transient
+ *     input on document.body, clicks it, and removes it again on
+ *     change. A delegated listener bound to an input "inside" the
+ *     component therefore never fires, which is why file upload was
+ *     completely dead in production.
+ *   - it rendered an empty <ul ref="fileList">. Real Form.io always
+ *     renders <ul class="list-group"> (no ref) carrying a
+ *     <li class="list-group-header"> with "File Name" and "Size",
+ *     whether or not any file is attached.
+ *   - it rendered zero datagrid rows for an empty value. Real Form.io
+ *     materialises one blank row regardless of `defaultValue: []`.
+ *
+ * The controller is evaluated BEFORE the form is rendered, because that
+ * is the order the platform uses: the customjs component is evaluated on
+ * the form's data lifecycle, which starts before the components have
+ * painted. Running it after render was the other half of the old
+ * harness's fiction — it let DOM decoration appear to work when in
+ * production it never ran against anything.
  */
 
 const fs = require("fs");
@@ -21,45 +41,28 @@ const ROOT = path.join(HERE, "..", "..");
 const APP_NODE_ID = "5439b0c95ce6e66d";
 const FORM_NODE_ID = "21d415924e0e4841";
 
+const DEFAULT_EXPORT = "aXet.SAP__Code_Companion_v5.2.0_export.deptapp";
+
 function main() {
     const exportPath =
-        process.argv[2] ||
-        path.join(ROOT, "build", "aXet.SAP__Code_Agents_v5.0.0_export.deptapp");
+        process.argv[2] || path.join(ROOT, "build", DEFAULT_EXPORT);
 
     const data = JSON.parse(fs.readFileSync(exportPath, "utf8"));
     const flows = data.flowsData.flows;
     const byId = Object.fromEntries(flows.map((node) => [node.id, node]));
 
     const css = byId[APP_NODE_ID].customCSS;
-
     const form = byId[FORM_NODE_ID];
     const components = form.formStructure.components;
 
-    const controller = components.find(
-        (component) => component.key === "serverSideJavaScript"
-    ).content;
+    const controller = findNested(components, "serverSideJavaScript").content;
 
-    const headerHtml = components.find(
-        (component) => component.key === "sapCodeAgentHeader"
-    ).content;
-
-    const surfaceHtml = components.find(
-        (component) => component.key === "chatSurfaceHtml"
-    ).content;
-
-    const budgetHtml = findNested(components, "promptBudget").content;
-
-    const sidebarHeaderHtml = findNested(components, "sidebarHeaderHtml");
-    const trayHostHtml = findNested(components, "attachmentTrayHost");
+    assertFormioAvailable();
 
     const page = renderPage({
         css,
         controller,
-        headerHtml,
-        surfaceHtml,
-        budgetHtml,
-        sidebarHeaderHtml: sidebarHeaderHtml ? sidebarHeaderHtml.content : "",
-        trayHostHtml: trayHostHtml ? trayHostHtml.content : ""
+        formStructure: form.formStructure
     });
 
     fs.writeFileSync(path.join(HERE, "index.html"), page, "utf8");
@@ -69,8 +72,28 @@ function main() {
             controller.length.toLocaleString() +
             " chars, css " +
             css.length.toLocaleString() +
-            " chars)"
+            " chars, " +
+            components.length +
+            " components rendered by real Form.io)"
     );
+}
+
+function assertFormioAvailable() {
+    const dist = path.join(
+        ROOT,
+        "node_modules",
+        "formiojs",
+        "dist",
+        "formio.full.min.js"
+    );
+
+    if (!fs.existsSync(dist)) {
+        throw new Error(
+            "formiojs is not installed. The harness renders the real " +
+                "Form.io DOM rather than a hand-written approximation of " +
+                "it; run `npm install` first."
+        );
+    }
 }
 
 function findNested(components, key) {
@@ -79,8 +102,8 @@ function findNested(components, key) {
             return component;
         }
 
-        if (Array.isArray(component.components)) {
-            const found = findNested(component.components, key);
+        for (const list of nestedLists(component)) {
+            const found = findNested(list, key);
 
             if (found) {
                 return found;
@@ -91,20 +114,32 @@ function findNested(components, key) {
     return null;
 }
 
-function renderPage({
-    css,
-    controller,
-    headerHtml,
-    surfaceHtml,
-    budgetHtml,
-    sidebarHeaderHtml,
-    trayHostHtml
-}) {
+function* nestedLists(component) {
+    if (Array.isArray(component.components)) {
+        yield component.components;
+    }
+
+    if (Array.isArray(component.columns)) {
+        for (const column of component.columns) {
+            if (column && Array.isArray(column.components)) {
+                yield column.components;
+            }
+        }
+    }
+}
+
+/* Keeps an inlined JSON payload from closing the surrounding script. */
+function inlineJson(value) {
+    return JSON.stringify(value).replace(/<\//g, "<\\/");
+}
+
+function renderPage({ css, controller, formStructure }) {
     return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <title>Code Companion — harness</title>
+<link rel="stylesheet" href="../../node_modules/formiojs/dist/formio.full.min.css">
 <style>
 ${css}
 </style>
@@ -115,7 +150,8 @@ ${css}
   Stand-in for the aXet platform shell. The hamburger below is written
   the way a shell that does NOT use any conventional toggle class name
   would write it — which is the case the original CSS-only removal
-  missed.
+  missed. This is the only hand-written markup in the harness, and it is
+  deliberately outside .formio-form: the application never renders it.
 -->
 <header class="platform-shell-header" style="display:flex;align-items:center;gap:12px;padding:10px 16px;background:#fff;border-bottom:1px solid #e2e8f0;">
   <button id="shell-hamburger" type="button" class="tb-icon-btn" aria-label="Open menu"
@@ -126,249 +162,140 @@ ${css}
   <span style="margin-left:auto;">Ummadisetti, Hariharan</span>
 </header>
 
-<div class="formio-form">
+<div id="formio-host"></div>
 
-  <!--
-    Sidebar panel. Best-effort reproduction of what a Form.io "container"
-    holding an htmlelement plus a "datagrid" is believed to render -- the
-    outer wrapper classes (.formio-component-container,
-    .formio-component-sidebarPanel) are the part actually load-bearing
-    for the CSS in history.css; the inner datagrid markup below is a
-    plausible approximation, not a verified one (Form.io itself is not
-    available in this harness). See docs/CHAT-HISTORY.md.
-  -->
-  <div class="formio-component formio-component-container formio-component-sidebarPanel sca-sidebar-panel">
-    <div class="formio-component formio-component-htmlelement">
-      <div class="sca-sidebar-header-host">
-${sidebarHeaderHtml}
-      </div>
-    </div>
-
-    <div class="formio-component formio-component-datagrid formio-component-conversationsGrid">
-      <table>
-        <thead><tr><th>Title</th><th>Updated</th><th>Open</th><th>Delete</th></tr></thead>
-        <tbody id="sca-harness-conversations-body"></tbody>
-      </table>
-    </div>
-  </div>
-
-  <!--
-    Form.io renders an htmlelement as <div class="{className}">, so the
-    header host class sits on the inner div, not the component wrapper.
-    Section 23 of the stylesheet is scoped with body:has(.sca-header-host),
-    so getting this nesting right is what makes those rules apply.
-  -->
-  <div class="formio-component formio-component-htmlelement">
-    <div class="sca-header-host">
-${headerHtml}
-    </div>
-  </div>
-
-  <div class="formio-component formio-component-htmlelement">
-    <div class="sca-chat-surface-host">
-${surfaceHtml}
-    </div>
-  </div>
-
-  <div class="formio-component formio-component-textarea formio-component-messagesJson">
-    <textarea name="data[messagesJson]">[]</textarea>
-  </div>
-
-  <div class="formio-component formio-component-textarea formio-component-attachmentsText">
-    <textarea name="data[attachmentsText]"></textarea>
-  </div>
-
-  <div class="formio-component formio-component-textarea formio-component-attachmentsJson">
-    <textarea name="data[attachmentsJson]">[]</textarea>
-  </div>
-
-  <div class="formio-component formio-component-container formio-component-composer sca-composer">
-    <div class="formio-component formio-component-htmlelement sca-prompt-budget-host">
-${budgetHtml}
-    </div>
-
-    <!--
-      Best-effort reproduction of Form.io's default "file" component
-      template (ref="fileDrop"/"fileBrowse", an underlying real
-      <input type="file">). This is the ONE shape in this harness with
-      no directly observed precedent -- see docs/CHAT-HISTORY.md -- but
-      the underlying <input type="file"> and its native change event
-      are standard HTML regardless of the exact wrapper markup around
-      them, which is what SCA-37's delegated listener actually depends
-      on.
-    -->
-    <div class="formio-component formio-component-container formio-component-attachmentBar sca-attachment-bar-host">
-      <div class="formio-component formio-component-file formio-component-attachmentPicker">
-        <div class="fileSelector" ref="fileDrop">
-          <i class="fa fa-cloud-upload"></i>
-          <span>Drop files to attach, or</span>
-          <a href="#" ref="fileBrowse">browse</a>
-          <input type="file" multiple accept=".docx,.pdf,.txt,.md,.markdown" style="opacity:0;position:absolute;inset:0;">
-        </div>
-        <ul ref="fileList" class="list-group"></ul>
-      </div>
-
-      <div class="formio-component formio-component-htmlelement">
-${trayHostHtml}
-      </div>
-    </div>
-
-    <div class="formio-component formio-component-textarea formio-component-userMessage">
-      <div class="form-group">
-        <textarea name="data[composer][userMessage]"
-                  placeholder="Ask an SAP coding-related question..."></textarea>
-      </div>
-    </div>
-
-    <div class="formio-component formio-component-button formio-component-sendMessage sca-send">
-      <button type="button" name="data[sendMessage]">&#10148;</button>
-    </div>
-  </div>
-
-  <div class="formio-component formio-component-button formio-component-newChat">
-    <button type="button" name="data[newChat]">New Chat</button>
-  </div>
-
-  <div class="formio-component formio-component-button formio-component-downloadResponse sca-download-submit">
-    <button type="button" name="data[downloadResponse]">Download</button>
-  </div>
-
-  <!--
-    CSS-hidden (history.css 26F), not Form.io hidden:true — a real,
-    clickable button ScaHistory.refreshConversationList() finds and
-    clicks, matching the technique already used for messagesJson etc.
-  -->
-  <div class="formio-component formio-component-button formio-component-loadConversations">
-    <button type="button" name="data[loadConversations]">Load Conversations</button>
-  </div>
-
-  <div class="formio-component formio-component-htmlelement">
-    <div id="sca-browser-controller-anchor" aria-hidden="true" style="display:none !important;"></div>
-  </div>
-
-</div>
-
+<script src="../../node_modules/formiojs/dist/formio.full.min.js"></script>
+<script id="sca-controller">
+${controller}
+</script>
 <script>
 /*
- * Minimal stand-in for the Form.io instance the controller reads state
- * from. Only the surface the controller actually touches is provided.
+ * Order matters and is deliberate — see the file header. The controller
+ * script above has already run by the time Form.io is asked to render.
  */
 (function () {
-    var formElement = document.querySelector(".formio-form");
+    var FORM_STRUCTURE = ${inlineJson(formStructure)};
 
-    var submissionData = {
-        messagesJson: "[]",
-        attachmentsText: "",
-        attachmentsJson: "[]",
-        currentStage: "understand",
-        agentPhase: "understand",
-        processing: false,
-        processingMessage: "",
-        userMessage: "",
-        composer: { userMessage: "" }
-    };
+    window.__harnessErrors = [];
 
-    formElement.__formio__ = { submission: { data: submissionData } };
+    window.addEventListener("error", function (event) {
+        window.__harnessErrors.push(String(event.message));
+    });
 
-    /* Mirror field edits into the submission, as Form.io would. */
-    document.addEventListener("input", function (event) {
-        var target = event.target;
-        var name = target && target.getAttribute && target.getAttribute("name");
+    Formio.createForm(document.getElementById("formio-host"), FORM_STRUCTURE, {
+        noAlerts: true
+    }).then(function (form) {
+        window.__harnessForm = form;
+        window.__harnessData = form.submission.data;
 
-        if (!name) {
-            return;
+        /*
+         * The platform exposes the live Form.io instance on the form
+         * element; the application's own controller (written by the
+         * original team, and working in production) reads state through
+         * exactly this handle.
+         */
+        var element = document.querySelector(".formio-form");
+
+        if (element) {
+            element.__formio__ = form;
         }
 
-        var match = /^data\\[([^\\]]+)\\](?:\\[([^\\]]+)\\])?$/.exec(name);
+        /* Records what a real submit would have carried away. */
+        window.__harnessSubmissions = [];
 
-        if (!match) {
-            return;
-        }
-
-        if (match[2]) {
-            submissionData[match[1]] = submissionData[match[1]] || {};
-            submissionData[match[1]][match[2]] = target.value;
-        } else {
-            submissionData[match[1]] = target.value;
-        }
-    }, true);
-
-    /* Records what a real submit would have carried away. */
-    window.__harnessSubmissions = [];
-
-    /*
-     * Bubble phase, deliberately: the controller's capture-phase handler
-     * runs first and writes the attachment fields, so by the time the
-     * event reaches here the submission looks exactly as Form.io would
-     * read it. The button is disabled by then (the turn is in flight),
-     * so its state is not a useful filter.
-     */
-    document.addEventListener("click", function (event) {
-        if (event.target.closest('button[name="data[sendMessage]"]')) {
-            window.__harnessSubmissions.push(
-                JSON.parse(JSON.stringify(submissionData))
-            );
-        }
-    }, false);
-
-    window.__harnessData = submissionData;
-    window.data = submissionData;
-
-    /*
-     * Minimal reproduction of Form.io re-rendering a datagrid from a
-     * bound array — enough to test this project's OWN CSS and the one
-     * behaviour (closing the sidebar after a row is opened, on narrow
-     * screens) that depends on the row buttons' class names. It is not
-     * a claim about how Form.io itself renders a datagrid.
-     */
-    window.__harnessRenderConversations = function (rows) {
-        submissionData.conversationsGrid = rows;
-
-        var body = document.getElementById("sca-harness-conversations-body");
-
-        body.innerHTML = "";
-
-        rows.forEach(function (row, index) {
-            var tr = document.createElement("tr");
-
-            tr.innerHTML =
-                '<td class="formio-component formio-component-title">' +
-                row.title +
-                '</td><td class="formio-component formio-component-updatedAtLabel">' +
-                row.updatedAtLabel +
-                '</td><td class="formio-component formio-component-open">' +
-                '<button type="button">open</button></td>' +
-                '<td class="formio-component formio-component-delete">' +
-                '<button type="button">delete</button></td>';
-
-            tr.querySelector(".formio-component-open button").addEventListener(
-                "click",
-                function () {
-                    submissionData.conversationsGrid.forEach(function (r) {
-                        r.open = false;
-                    });
-                    submissionData.conversationsGrid[index].open = true;
+        /*
+         * Capture phase, not bubble. Form.io's own button handler calls
+         * stopPropagation(), so a bubble listener on document never sees
+         * a send click at all — the old hand-written harness used bubble
+         * and only worked because its buttons were plain markup with no
+         * Form.io handler on them.
+         *
+         * Capture still gives the ordering this needs: the controller
+         * registers its own capture listener at boot, before this one, so
+         * it has already written the attachment fields by the time the
+         * snapshot below is taken.
+         */
+        document.addEventListener(
+            "click",
+            function (event) {
+                /*
+                 * Matched on the component class, not on
+                 * name="data[sendMessage]". Real Form.io nests a
+                 * button's name under its container, so the send
+                 * button is actually name="data[composer][sendMessage]"
+                 * — the old hand-written harness got this wrong too.
+                 */
+                if (
+                    event.target.closest(
+                        ".formio-component-sendMessage button"
+                    )
+                ) {
+                    window.__harnessSubmissions.push(
+                        JSON.parse(JSON.stringify(form.submission.data))
+                    );
                 }
-            );
+            },
+            true
+        );
 
-            tr.querySelector(".formio-component-delete button").addEventListener(
-                "click",
-                function () {
-                    submissionData.conversationsGrid.forEach(function (r) {
-                        r["delete"] = false;
-                    });
-                    submissionData.conversationsGrid[index]["delete"] = true;
-                }
-            );
+        /*
+         * Puts a file through the component's real value channel: the
+         * shape below is exactly what formiojs' base64 storage provider
+         * resolves to (providers/storage/base64.js), which is what the
+         * platform stores in the submission.
+         */
+        window.__harnessAttach = function (name, mime, base64) {
+            var picker = form.getComponent("attachmentPicker");
 
-            body.appendChild(tr);
-        });
-    };
+            if (!picker) {
+                throw new Error("attachmentPicker component not found");
+            }
+
+            var existing = Array.isArray(picker.dataValue)
+                ? picker.dataValue.slice()
+                : [];
+
+            existing.push({
+                storage: "base64",
+                name: name,
+                originalName: name,
+                url: "data:" + mime + ";base64," + base64,
+                size: Math.round((base64.length * 3) / 4),
+                type: mime
+            });
+
+            picker.setValue(existing, { modified: true });
+            form.triggerChange();
+
+            return existing.length;
+        };
+
+        window.__harnessAttachedNames = function () {
+            var picker = form.getComponent("attachmentPicker");
+            var value = picker && picker.dataValue;
+
+            return (Array.isArray(value) ? value : []).map(function (file) {
+                return file.name;
+            });
+        };
+
+        /* Drives the conversation list through the real datagrid value. */
+        window.__harnessSetConversations = function (rows) {
+            var grid = form.getComponent("conversationsGrid");
+
+            if (!grid) {
+                throw new Error("conversationsGrid component not found");
+            }
+
+            grid.setValue(rows, { modified: true });
+            form.triggerChange();
+
+            return grid.dataValue.length;
+        };
+
+        window.__harnessReady = true;
+    });
 })();
-</script>
-
-<script>
-${controller}
 </script>
 
 </body>
