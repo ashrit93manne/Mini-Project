@@ -22,6 +22,8 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from conversation_history import SIDEBAR_TOGGLE_HTML  # noqa: E402
+from error_surface import fix_error_surface  # noqa: E402
+from rag_hardening import harden_rag  # noqa: E402
 from ui_v52 import reshape_ui  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -1330,7 +1332,14 @@ def main():
     #    outputs/wires are untouched; reshape_ui asserts that.
     reshape_ui(export, FORM_NODE_ID)
 
-    # 4. Version
+    # 4. Make the RAG chain fail open. v5.1.0 put it in front of every
+    #    chat turn and let it discard messages it could not enrich.
+    harden_rag(export)
+
+    # 5. A failed turn must read as a sentence, not as EJS source.
+    fix_error_surface(export)
+
+    # 6. Version
     info = export["info"]["deptAppVersionInfo"]
     info["alias"] = NEW_VERSION_ALIAS
     info["descriptionMessage"] = NEW_VERSION_MESSAGE

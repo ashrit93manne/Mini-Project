@@ -191,8 +191,21 @@ var ScaAttachmentUi = (function buildScaAttachmentUi() {
         return Array.isArray(node) ? node : [];
     }
 
+    /*
+     * Form.io renames an uploaded file — the base64 provider stores it
+     * as "spec-<uuid>.docx" and keeps what the developer actually chose
+     * in `originalName`. The chip, the duplicate check and the prompt
+     * block all have to use the name the developer recognises, so every
+     * one of them goes through here.
+     */
+    function pickerNameOf(entry) {
+        return String(
+            (entry && (entry.originalName || entry.name)) || "attachment"
+        );
+    }
+
     function pickerKeyOf(entry) {
-        return String(entry.name || "") + "|" + (Number(entry.size) || 0);
+        return pickerNameOf(entry) + "|" + (Number(entry.size) || 0);
     }
 
     /* "data:text/plain;base64,AAAA" -> Uint8Array */
@@ -249,7 +262,7 @@ var ScaAttachmentUi = (function buildScaAttachmentUi() {
              * nothing.
              */
             if (seen.indexOf(key) !== -1) {
-                duplicates.push(String(entry.name || ""));
+                duplicates.push(pickerNameOf(entry));
                 duplicateIndices.push(index);
                 return;
             }
@@ -270,7 +283,7 @@ var ScaAttachmentUi = (function buildScaAttachmentUi() {
             state.pickerKeys.push(key);
 
             fresh.push(
-                new File([bytes], String(entry.name || "attachment"), {
+                new File([bytes], pickerNameOf(entry), {
                     type: String(entry.type || "application/octet-stream")
                 })
             );
@@ -335,7 +348,7 @@ var ScaAttachmentUi = (function buildScaAttachmentUi() {
 
         for (var i = 0; i < entries.length; i += 1) {
             if (
-                String(entries[i].name || "") === String(name) &&
+                pickerNameOf(entries[i]) === String(name) &&
                 (Number(entries[i].size) || 0) === (Number(bytes) || 0)
             ) {
                 index = i;

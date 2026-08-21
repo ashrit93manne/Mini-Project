@@ -389,6 +389,69 @@ async function main() {
         "clicking #sca-attach-button did not reach [ref=fileBrowse]"
     );
 
+    /*
+     * The real path, end to end: a click on our own button, Form.io's
+     * own browse affordance, its own file dialog, its own base64
+     * storage provider, and only then this project's ingestion.
+     *
+     * Everything else in this suite drives the component's value
+     * directly. This is the one test that proves the chain a developer
+     * actually touches is connected — the exact chain that was broken
+     * in v5.0.0 and v5.1.0 and that no test covered.
+     */
+    const chooserOpened = await (async () => {
+        try {
+            const [chooser] = await Promise.all([
+                page.waitForEvent("filechooser", { timeout: 8000 }),
+                page.click("#sca-attach-button")
+            ]);
+
+            await chooser.setFiles(path.join(FIXTURES, "sample.docx"));
+
+            return true;
+        } catch (error) {
+            return false;
+        }
+    })();
+
+    check(
+        "clicking Attach opens the platform's own file dialog",
+        chooserOpened,
+        "no filechooser event — the button is not wired to Form.io's browse"
+    );
+
+    if (chooserOpened) {
+        let picked = true;
+
+        await waitForChip(page, 15000).catch(() => {
+            picked = false;
+        });
+
+        check("a file picked that way is extracted", picked);
+
+        check(
+            "the chip shows the name the developer chose",
+            await page.evaluate(() =>
+                /^sample\.docx$/m.test(
+                    (
+                        document.querySelector(".sca-chip-label") ||
+                        document.querySelector(".sca-chip") ||
+                        {}
+                    ).textContent || ""
+                )
+            ),
+            await page.evaluate(
+                () =>
+                    (document.querySelector("#sca-attachment-tray") || {})
+                        .innerText
+            )
+        );
+
+        /* Put the composer back for the tests that follow. */
+        await page.evaluate(() => window.ScaAttachmentUi.clear());
+        await page.waitForTimeout(400);
+    }
+
     check(
         "the tray host exists and starts empty",
         (await page.locator("#sca-attachment-tray").count()) === 1 &&

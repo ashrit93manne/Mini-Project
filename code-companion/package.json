@@ -11,7 +11,8 @@
     "test:backend": "node tests/backend.test.js",
     "test:history-backend": "node tests/history-backend.test.js",
     "test:browser": "node tests/browser.test.js",
-    "test": "npm run build && npm run harness && npm run test:parsers && npm run test:backend && npm run test:history-backend && npm run test:browser"
+    "test": "npm run build && npm run harness && npm run test:parsers && npm run test:backend && npm run test:history-backend && npm run test:rag-backend && npm run test:browser",
+    "test:rag-backend": "node tests/rag-backend.test.js"
   },
   "devDependencies": {
     "formiojs": "4.21.7",
