@@ -292,4 +292,158 @@ def harden_rag(export):
         rank["func"], "BM25 Rank + Build RAG Context", "msg"
     )
 
+    # ---- the FAQ nodes, on the same terms -------------------------
+    for name, on_failure in (
+        ("Prepare FAQ Lookup", "msg"),
+        ("Match FAQ + Ground", "msg"),
+    ):
+        faq_node = by_name.get(name)
+
+        if faq_node is None:
+            raise RagPatchError(name + " not found")
+
+        faq_node["func"] = _wrap_fail_open(faq_node["func"], name, on_failure)
+
+    _harden_check_err(export)
+
     return export
+
+# ---------------------------------------------------------------
+# 5. Check err: a retrieval failure must not cost the developer the turn
+# ---------------------------------------------------------------
+
+CHECK_ERR_ANCHOR = """/* =========================================================
+
+ * CER-02 — CLASSIFY TRANSIENT AND PERMANENT FAILURES
+
+ * ========================================================= */"""
+
+CHECK_ERR_BYPASS = """/* =========================================================
+
+ * CER-01B — RETRIEVAL FAILURES ARE NOT THE USER'S PROBLEM
+
+ *
+
+ * Hardening the RAG nodes made the chat path reach the retrieval
+
+ * nosql-query nodes for the first time; before it, the message was
+
+ * discarded upstream and they never ran. A collection that does not
+
+ * exist yet, or a database blip, would otherwise land here and be
+
+ * turned into a user-facing error — losing a turn over a missing
+
+ * enhancement.
+
+ *
+
+ * Output 1 already leads back to Validate + Build SAP Agent Prompt (it
+
+ * is the retry path), so continuing the turn ungrounded needs no new
+
+ * wiring: strip the error, drop whatever retrieval state exists, and
+
+ * send it on. Only failures of the model call itself, or of prompt
+
+ * building, are worth showing anybody.
+
+ * ========================================================= */
+
+const RETRIEVAL_NODE_NAMES = {
+
+  "Prepare RAG Ingestion": 1,
+
+  "Persist RAG Chunks": 1,
+
+  "Prepare RAG Retrieval Query": 1,
+
+  "Load Conversation RAG Chunks": 1,
+
+  "BM25 Rank + Build RAG Context": 1,
+
+  "Prepare FAQ Lookup": 1,
+
+  "Load FAQ Entries": 1,
+
+  "Match FAQ + Ground": 1
+
+};
+
+const failingNodeName =
+
+  msg.error &&
+
+  msg.error.source &&
+
+  msg.error.source.name
+
+    ? String(msg.error.source.name)
+
+    : "";
+
+if (RETRIEVAL_NODE_NAMES[failingNodeName]) {
+
+  node.warn({
+
+    component: "Check err",
+
+    section: "CER-01B",
+
+    event: "retrieval-failure-bypassed",
+
+    failingNode: failingNodeName,
+
+    detail: "Continuing the turn without retrieved context."
+
+  });
+
+  delete msg.error;
+
+  delete msg.safeError;
+
+  msg.ragCandidates = [];
+
+  msg.ragContextText = "";
+
+  msg.faqContextText = "";
+
+  msg.ragSkipped = true;
+
+  node.status({
+
+    fill: "yellow",
+
+    shape: "dot",
+
+    text: "Retrieval skipped"
+
+  });
+
+  return [msg, null];
+
+}
+
+
+
+/* =========================================================
+
+ * CER-02 — CLASSIFY TRANSIENT AND PERMANENT FAILURES
+
+ * ========================================================= */"""
+
+
+def _harden_check_err(export):
+    for node in export["flowsData"]["flows"]:
+        if node.get("type") == "function" and node.get("name") == "Check err":
+            node["func"] = _patch(
+                node["func"],
+                CHECK_ERR_ANCHOR,
+                CHECK_ERR_BYPASS,
+                "Check err retrieval bypass",
+            )
+            return
+
+    raise RagPatchError("Check err node not found")
+
+

@@ -23,6 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from conversation_history import SIDEBAR_TOGGLE_HTML  # noqa: E402
 from error_surface import fix_error_surface  # noqa: E402
+from faq_layer import add_faq_layer  # noqa: E402
 from rag_hardening import harden_rag  # noqa: E402
 from ui_v52 import reshape_ui  # noqa: E402
 
@@ -36,18 +37,20 @@ BACKEND_TAB_ID = "6a7c6094850c144e"
 
 NEW_VERSION_ALIAS = "v5.2.0"
 NEW_VERSION_MESSAGE = (
-    "Code Companion v5.2.0 - working file attachment and a clean chat "
-    "surface. The Form.io file component is now read through its VALUE "
-    "(base64) instead of a change event on an input Form.io never "
-    "renders, which is why upload did nothing in v5.0.0/v5.1.0. The "
-    "file component and the conversations datagrid are hidden by "
+    "Code Companion v5.2.0 - working file attachment, a clean chat "
+    "surface, and a chat path that cannot be blocked by retrieval. "
+    "The Form.io file component is read through its VALUE (base64) "
+    "instead of a change event on an input Form.io never renders. The "
+    "file component and conversations datagrid are hidden by "
     "structural CSS and driven through their own controls, so their "
-    "stock chrome ('File Name / Size', 'Drop files to attach', a blank "
-    "datagrid row) no longer shows through the composer and sidebar. "
-    "The visible attach control and conversation list are plain HTML in "
-    "declared htmlelements. The duplicate header New Chat button is "
-    "hidden in favour of the sidebar's New Conversation. All v5.1.0 RAG "
-    "backend nodes are carried through unchanged."
+    "stock chrome no longer shows through. v5.1.0's RAG chain sat in "
+    "front of every message and discarded turns it could not enrich - "
+    "it is fail-open now, require('crypto') is gone, and a retrieval "
+    "failure continues to the model ungrounded instead of becoming a "
+    "user-facing error. Error banners are static text and the real "
+    "reason goes into the chat. New: an FAQ layer (collection "
+    "sca-faqs, with built-in defaults) giving greetings and common "
+    "SAP questions consistent house guidance."
 )
 
 CONTROLLER_VERSION_OLD = '"5.0.1"'
@@ -1332,14 +1335,20 @@ def main():
     #    outputs/wires are untouched; reshape_ui asserts that.
     reshape_ui(export, FORM_NODE_ID)
 
-    # 4. Make the RAG chain fail open. v5.1.0 put it in front of every
-    #    chat turn and let it discard messages it could not enrich.
+    # 4. Curated FAQ guidance, retrieved and ranked the same way
+    #    attachment chunks are. Inserted BEFORE hardening so its own
+    #    function nodes get the same fail-open treatment.
+    add_faq_layer(export)
+
+    # 5. Make the retrieval chain fail open. v5.1.0 put it in front of
+    #    every chat turn and let it discard messages it could not
+    #    enrich.
     harden_rag(export)
 
-    # 5. A failed turn must read as a sentence, not as EJS source.
+    # 6. A failed turn must read as a sentence, not as EJS source.
     fix_error_surface(export)
 
-    # 6. Version
+    # 7. Version
     info = export["info"]["deptAppVersionInfo"]
     info["alias"] = NEW_VERSION_ALIAS
     info["descriptionMessage"] = NEW_VERSION_MESSAGE

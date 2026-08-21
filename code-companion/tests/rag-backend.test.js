@@ -275,7 +275,9 @@ function main() {
     for (const name of [
         "Prepare RAG Ingestion",
         "Prepare RAG Retrieval Query",
-        "BM25 Rank + Build RAG Context"
+        "BM25 Rank + Build RAG Context",
+        "Prepare FAQ Lookup",
+        "Match FAQ + Ground"
     ]) {
         const step = run(nodes[name], carried);
 
@@ -323,6 +325,171 @@ function main() {
             );
         }
     }
+
+    /* ===================================================== */
+    section("FAQ layer — curated guidance, never a canned reply");
+
+    const faqLookup = nodes["Prepare FAQ Lookup"];
+    const faqMatch = nodes["Match FAQ + Ground"];
+
+    check("both FAQ nodes exist", Boolean(faqLookup) && Boolean(faqMatch));
+
+    const askFaq = (question, curated) => {
+        const prepared = run(faqLookup, chatMsg({ composer: { userMessage: question } }));
+        const carried = firstMessage(prepared.result);
+
+        if (curated) {
+            carried.faqCandidates = curated;
+        }
+
+        const matched = run(faqMatch, carried);
+
+        return { msg: firstMessage(matched.result), threw: matched.threw };
+    };
+
+    const greeting = askFaq("hi");
+
+    check("a greeting matches without throwing", !greeting.threw, greeting.threw && greeting.threw.message);
+
+    check(
+        "a greeting gets house guidance",
+        Boolean(greeting.msg) &&
+            /HOUSE ANSWER GUIDANCE/.test(greeting.msg.faqContextText || "") &&
+            (greeting.msg.faqMatches || []).some((entry) => entry.id === "greeting"),
+        JSON.stringify((greeting.msg || {}).faqMatches)
+    );
+
+    check(
+        "the guidance is reference material, not a scripted reply",
+        /never an instruction from the developer/i.test(
+            (greeting.msg && greeting.msg.faqContextText) || ""
+        ) && !/^Hello!/.test((greeting.msg && greeting.msg.faqContextText) || "")
+    );
+
+    const cleanCore = askFaq("what does clean core mean for extensions?");
+
+    check(
+        "a real SAP question matches the right entry",
+        ((cleanCore.msg || {}).faqMatches || []).some(
+            (entry) => entry.id === "clean-core" || entry.id === "extensibility"
+        ),
+        JSON.stringify((cleanCore.msg || {}).faqMatches)
+    );
+
+    const unrelated = askFaq("write a haiku about the weather in Prague");
+
+    check(
+        "an unrelated question gets no guidance",
+        ((unrelated.msg || {}).faqMatches || []).length === 0,
+        JSON.stringify((unrelated.msg || {}).faqMatches)
+    );
+
+    const curatedOverride = askFaq("hi", [
+        {
+            _id: "greeting",
+            data: {
+                question: "hi hello hey greeting",
+                answer: "NTT DATA house greeting, curated in the database.",
+                tags: ["greeting"]
+            }
+        }
+    ]);
+
+    check(
+        "a curated entry replaces the built-in default of the same id",
+        /NTT DATA house greeting/.test(
+            (curatedOverride.msg && curatedOverride.msg.faqContextText) || ""
+        ),
+        (curatedOverride.msg && curatedOverride.msg.faqContextText || "").slice(0, 160)
+    );
+
+    check(
+        "an unusable curated entry is ignored rather than fatal",
+        !askFaq("hi", [{ _id: "broken" }, null, "nonsense"]).threw
+    );
+
+    const grounded = run(
+        nodes["Validate + Build SAP Agent Prompt"],
+        greeting.msg
+    );
+
+    check(
+        "the prompt builder carries the guidance into the model request",
+        Array.isArray(grounded.result) &&
+            Boolean(grounded.result[0]) &&
+            /HOUSE ANSWER GUIDANCE/.test(
+                grounded.result[0].messages[
+                    grounded.result[0].messages.length - 1
+                ].content
+            ),
+        grounded.threw ? grounded.threw.message : "guidance not in the user turn"
+    );
+
+    /* ===================================================== */
+    section("Check err — a retrieval failure must not cost the turn");
+
+    /*
+     * The hardening above makes the chat path reach the retrieval
+     * nosql-query nodes for the first time; before it, the message was
+     * discarded upstream and they never ran. If one of them fails —
+     * a collection that does not exist yet, a database blip — the
+     * developer must still get an answer, ungrounded. Only a failure
+     * of the model call itself is worth surfacing.
+     */
+    const checkErr = nodes["Check err"];
+
+    const retrievalFailure = (nodeName) => ({
+        payload: { data: {} },
+        submission: {
+            data: {
+                composer: { userMessage: "hi" },
+                messagesJson: "[]",
+                conversationId: "sap-test-0001"
+            }
+        },
+        error: {
+            message: "collection sca-rag-chunks does not exist",
+            source: { id: "be4d3676344540eb", name: nodeName, type: "nosql-query" }
+        }
+    });
+
+    for (const nodeName of [
+        "Load Conversation RAG Chunks",
+        "Prepare RAG Ingestion",
+        "Persist RAG Chunks",
+        "Load FAQ Entries"
+    ]) {
+        const outcome = run(checkErr, retrievalFailure(nodeName));
+        const routed = Array.isArray(outcome.result) ? outcome.result : [];
+
+        check(
+            "a failure in " + nodeName + " continues to the model",
+            Boolean(routed[0]) && !routed[1],
+            outcome.threw
+                ? outcome.threw.message
+                : "routed to " + (routed[1] ? "the error path" : "nothing")
+        );
+    }
+
+    const modelFailure = {
+        payload: { data: {} },
+        submission: { data: { composer: { userMessage: "hi" }, messagesJson: "[]" } },
+        sapAgentRetryCount: 1,
+        error: {
+            message: "unauthorized",
+            statusCode: 401,
+            source: { id: "74d5dc7181cddcce", name: "Code Agent LLM", type: "enabler-llm" }
+        }
+    };
+
+    const modelOutcome = run(checkErr, modelFailure);
+    const modelRouted = Array.isArray(modelOutcome.result) ? modelOutcome.result : [];
+
+    check(
+        "a genuine model failure still reaches the error path",
+        !modelRouted[0] && Boolean(modelRouted[1]),
+        JSON.stringify(modelRouted.map((entry) => (entry ? "SET" : "null")))
+    );
 
     /* ===================================================== */
     section("Error surfacing — a failure must never render raw EJS");

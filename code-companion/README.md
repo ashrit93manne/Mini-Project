@@ -10,35 +10,47 @@ and regression-tested rather than hand-edited as an 800 KB JSON blob.
 
 ## What changed in v5.2.0
 
-v5.2.0 fixes the user interface. Against the v5.1.0 release:
+Two releases' worth of faults, in the interface and in the chat path.
 
-1. **File attachment now works.** It did not before — not "worked but
-   looked wrong", *no file was ever ingested*. v5.0.0/v5.1.0 listened
-   for a `change` event on an `<input type="file">` inside the Form.io
-   `file` component; that input does not exist in any Form.io version
-   (`File.browseFiles()` creates one on `document.body` and removes it
-   again), so the listener could never fire. Intake now reads the
-   component's **value** — the base64 objects the platform actually
-   stores. See
+**The interface** (v5.0.0/v5.1.0 shipped these):
+
+1. **File attachment now works.** It did not before — *no file was ever
+   ingested*. The code listened for a `change` event on an
+   `<input type="file">` inside the Form.io `file` component; that input
+   does not exist in any Form.io version (`File.browseFiles()` creates
+   one on `document.body` and removes it again). Intake now reads the
+   component's **value**. See
    [`docs/FILE-UPLOAD.md`](docs/FILE-UPLOAD.md#version-note-why-this-is-v3).
 2. **The composer and sidebar are clean.** Form.io's stock chrome was
-   showing through: an empty "File Name / Size" table above the message
-   box, a "Drop files to attach, or browse" zone across it, and a blank
-   phantom datagrid row of editable inputs in the sidebar. The `file`
-   and `datagrid` components are now hidden by **structural** CSS keyed
-   on their own component class — never a class added at runtime, which
-   is what made the previous attempt depend on when the controller
-   happened to run — and the visible attach control and conversation
-   list are plain HTML in declared `htmlelement`s.
+   showing through — an empty "File Name / Size" table, a "Drop files to
+   attach" zone across the message box, and a blank phantom datagrid row
+   of editable inputs in the sidebar. The `file` and `datagrid`
+   components are hidden by **structural** CSS now, and the visible
+   attach control and conversation list are plain HTML in declared
+   `htmlelement`s.
 3. **The header's duplicate "New Chat" button is hidden**, leaving the
-   sidebar's "+ New Conversation". The component itself is untouched:
-   that link works by clicking it.
-4. **The test harness renders real Form.io.** This is the change that
-   made the rest findable — see below.
+   sidebar's "+ New Conversation". The component is untouched: that link
+   works by clicking it.
 
-No flow node was added or removed: `tools/diff_export.py` reports
-71 -> 71, with only the app node (stylesheet) and form node (controller,
-components) changed. Every v5.1.0 RAG node is carried through untouched.
+**The chat path** (v5.1.0 shipped these — the agent answered nothing at
+all, not even "hi", and showed a banner reading
+`<%= messages.errorTitle %>`):
+
+4. **Retrieval no longer blocks the conversation.** v5.1.0 put RAG in
+   front of every message and let two nodes discard the turn when no
+   user identity resolved. Both are fail-open now, `require("crypto")`
+   is gone, and `Check err` routes a retrieval failure back to the
+   prompt builder instead of to an error. See
+   [`docs/RAG-AND-FAQ.md`](docs/RAG-AND-FAQ.md).
+5. **A failed turn reads as a sentence**, not as EJS source: the banners
+   are static text and the real reason goes into the chat transcript.
+6. **An FAQ layer**, retrieved from NoSQL and ranked the same way
+   attachment chunks are, gives greetings and common SAP questions
+   consistent house guidance — grounding for the model, never a canned
+   reply.
+
+Three nodes were added (the FAQ chain) and none removed:
+`tools/diff_export.py` reports 71 -> 74.
 
 ## Why the tests did not catch any of this
 
@@ -78,7 +90,8 @@ src/
     sca-app-chrome.js          menu-toggle removal
     sca-history.js             sidebar toggle, conversation-list rendering, delegated clicks
   backend/
-    conversation-functions.js  the six new Node-RED function bodies, as testable JS
+    conversation-functions.js  the six conversation-history function bodies
+    faq-functions.js           the FAQ lookup and matcher, plus the built-in set
   css/
     attachments.css            attachment row, attach button, chip tray; hides the file component (v3)
     chrome.css                 hardened menu removal
@@ -87,6 +100,9 @@ tools/
   build_deptapp.py             assembles the export from the v5.1.0 base + v4.6.2 pristine + src
   conversation_history.py      conversation-history flow-node constructors (applied in v5.0.0)
   ui_v52.py                    v5.2.0 presentation reshaping (idempotent, adds no nodes)
+  rag_hardening.py             makes the retrieval chain fail open
+  error_surface.py             a failed turn reads as a sentence, not EJS source
+  faq_layer.py                 inserts the FAQ chain into the retrieval path
   node_builders.py             Form.io/Node-RED node constructors used by the above
   diff_export.py               structural comparison against the baseline
   extract.js                   prints what the engine extracts from a file
@@ -97,6 +113,7 @@ tests/
   parsers.test.js              extraction engine, under Node
   backend.test.js               the original three patched Node-RED nodes
   history-backend.test.js       the six new conversation-history nodes
+  rag-backend.test.js           the retrieval chain and the FAQ layer
   browser.test.js               the built export, rendered by real Form.io under Chromium
   harness/                      generated page that renders the built export via formiojs
   fixtures/                     test documents and their expected text
@@ -150,9 +167,10 @@ npm test          # build, then all four suites
 | `test:parsers` | DOCX, PDF, plain text, the XML tokenizer, budget and truncation — 52 assertions |
 | `test:backend` | The original three patched Node-RED nodes — 31 assertions |
 | `test:history-backend` | The six new conversation-history nodes, including both plausible NoSQL result shapes and not-found/malformed-input cases — 30 assertions |
-| `test:browser` | The built export rendered by **real Form.io** in Chromium: layout at three breakpoints, attachment intake through the component's value, send gating, submitted payload, and the sidebar (desktop column, mobile overlay, delegated New-Conversation/refresh clicks) — 87 assertions |
+| `test:rag-backend` | The retrieval chain and the FAQ layer, executed without `require` so a Node-RED sandbox's real constraints apply — 33 assertions |
+| `test:browser` | The built export rendered by **real Form.io** in Chromium: the attach button driving Form.io's own file dialog end to end, layout at three breakpoints, send gating, submitted payload, and the sidebar — 90 assertions |
 
-**200 assertions total, all green from a clean build.**
+**236 assertions total, all green from a clean build.**
 
 The browser suite loads `tests/harness/index.html`, which is generated
 *from the built `.deptapp`* and rendered by the real Form.io renderer —
