@@ -113,6 +113,7 @@ tests/
   parsers.test.js              extraction engine, under Node
   backend.test.js               the original three patched Node-RED nodes
   history-backend.test.js       the six new conversation-history nodes
+  build.test.js                 the build is reproducible and fails loudly
   rag-backend.test.js           the retrieval chain and the FAQ layer
   browser.test.js               the built export, rendered by real Form.io under Chromium
   harness/                      generated page that renders the built export via formiojs
@@ -143,7 +144,16 @@ reshaped by `ui_v52.py`, which adds no buttons and asserts the form
 node's `outputs`/`wires` shape is unchanged.
 
 Every patch fails loudly rather than silently: an anchor that no longer
-matches raises immediately.
+matches stops the build with `BUILD FAILED` and writes nothing. That
+also means the build refuses to run over its own output — the anchors
+are already applied — which is deliberate, and covered by
+`tests/build.test.js`.
+
+The build is **reproducible**: two builds of identical sources are
+byte-identical. Reviewing this project depends on being able to ask
+"did anything actually change?" of a generated 950 KB JSON file, and a
+single randomly generated component id was enough to make that question
+unanswerable.
 
 ```bash
 python3 tools/diff_export.py \
@@ -167,10 +177,11 @@ npm test          # build, then all four suites
 | `test:parsers` | DOCX, PDF, plain text, the XML tokenizer, budget and truncation — 52 assertions |
 | `test:backend` | The original three patched Node-RED nodes — 31 assertions |
 | `test:history-backend` | The six new conversation-history nodes, including both plausible NoSQL result shapes and not-found/malformed-input cases — 30 assertions |
+| `test:build` | The build is deterministic, refuses to run over its own output, and leaves no half-written artefact — 4 assertions |
 | `test:rag-backend` | The retrieval chain and the FAQ layer, executed without `require` so a Node-RED sandbox's real constraints apply — 33 assertions |
 | `test:browser` | The built export rendered by **real Form.io** in Chromium: the attach button driving Form.io's own file dialog end to end, layout at three breakpoints, send gating, submitted payload, and the sidebar — 90 assertions |
 
-**236 assertions total, all green from a clean build.**
+**240 assertions total, all green from a clean build.**
 
 The browser suite loads `tests/harness/index.html`, which is generated
 *from the built `.deptapp`* and rendered by the real Form.io renderer —

@@ -22,10 +22,10 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from conversation_history import SIDEBAR_TOGGLE_HTML  # noqa: E402
-from error_surface import fix_error_surface  # noqa: E402
-from faq_layer import add_faq_layer  # noqa: E402
-from rag_hardening import harden_rag  # noqa: E402
-from ui_v52 import reshape_ui  # noqa: E402
+from error_surface import ErrorSurfaceError, fix_error_surface  # noqa: E402
+from faq_layer import FaqLayerError, add_faq_layer  # noqa: E402
+from rag_hardening import RagPatchError, harden_rag  # noqa: E402
+from ui_v52 import ReshapeError, reshape_ui  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -1370,6 +1370,9 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except PatchError as error:
-        print(f"BUILD FAILED\n{error}", file=sys.stderr)
+    except (PatchError, RagPatchError, ErrorSurfaceError, FaqLayerError,
+            ReshapeError) as error:
+        # Every one of these means an anchor this build depends on no
+        # longer matches. That is a loud stop, never a partial write.
+        print(f"BUILD FAILED\n{type(error).__name__}: {error}", file=sys.stderr)
         sys.exit(1)

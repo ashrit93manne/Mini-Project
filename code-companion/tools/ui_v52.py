@@ -40,7 +40,9 @@ baseline already contains, so a rebuild over an already-reshaped export
 is a no-op rather than a duplication.
 """
 
-from node_builders import htmlelement_component, new_id
+import hashlib
+
+from node_builders import htmlelement_component
 
 
 # The visible attach control, plus the chip tray it sits beside. Both
@@ -75,6 +77,49 @@ CONVERSATION_LIST_HTML = """
 
 class ReshapeError(RuntimeError):
     pass
+
+
+def _stable_id(key, components):
+    """
+    A component id derived from the key rather than randomly generated.
+
+    node_builders.new_id() is random, which made the build produce a
+    different artefact every run. Reviewing this project depends on
+    being able to ask "did anything actually change?" of a generated
+    950 KB JSON file, and a fresh random id every build makes that
+    question unanswerable — diff_export's output stops meaning
+    anything.
+    """
+    taken = set()
+
+    def collect(items):
+        for item in items or []:
+            if not isinstance(item, dict):
+                continue
+
+            if item.get("id"):
+                taken.add(item["id"])
+
+            collect(item.get("components"))
+
+            columns = item.get("columns")
+
+            if isinstance(columns, list):
+                for column in columns:
+                    if isinstance(column, dict):
+                        collect(column.get("components"))
+
+    collect(components)
+
+    digest = hashlib.sha1(key.encode("utf8")).hexdigest()
+
+    for offset in range(64):
+        candidate = digest[offset : offset + 16]
+
+        if len(candidate) == 16 and candidate not in taken:
+            return candidate
+
+    raise ReshapeError("could not derive a free component id for " + key)
 
 
 def _find(components, key):
@@ -178,7 +223,7 @@ def reshape_ui(export, form_node_id):
             "conversationListHost",
             "Conversation List",
             CONVERSATION_LIST_HTML,
-            new_id(),
+            _stable_id("conversationListHost", components),
         )
 
         # Before the datagrid, so the visible list is first in the
