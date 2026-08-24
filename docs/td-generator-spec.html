@@ -1,0 +1,556 @@
+<title>TD Generator Build Spec</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&display=swap">
+
+<style>
+:root{
+  --bg:#f5f7fb;
+  --surface:#ffffff;
+  --surface-2:#eef1f7;
+  --ink:#101a2e;
+  --ink-2:#33405a;
+  --muted:#5f6d87;
+  --faint:#8794ab;
+  --line:#dde3ee;
+  --line-2:#c9d2e3;
+  --accent:#00408f;
+  --accent-soft:#e8eefb;
+  --teal:#0a6f88;
+  --teal-soft:#e2f2f6;
+  --good:#1c6b4a;
+  --good-soft:#e4f3ec;
+  --warn:#8a5a08;
+  --warn-soft:#fbf1dd;
+  --shadow:0 1px 2px rgba(16,26,46,.06),0 8px 24px -16px rgba(16,26,46,.28);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0d1320;
+    --surface:#141c2c;
+    --surface-2:#1b2436;
+    --ink:#e8edf7;
+    --ink-2:#c3cdde;
+    --muted:#93a1b8;
+    --faint:#71809a;
+    --line:#26314a;
+    --line-2:#33405c;
+    --accent:#7aa9f0;
+    --accent-soft:#1a2740;
+    --teal:#5ec2d8;
+    --teal-soft:#12313a;
+    --good:#67c99a;
+    --good-soft:#122c22;
+    --warn:#e0b061;
+    --warn-soft:#302512;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -16px rgba(0,0,0,.8);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0d1320;
+  --surface:#141c2c;
+  --surface-2:#1b2436;
+  --ink:#e8edf7;
+  --ink-2:#c3cdde;
+  --muted:#93a1b8;
+  --faint:#71809a;
+  --line:#26314a;
+  --line-2:#33405c;
+  --accent:#7aa9f0;
+  --accent-soft:#1a2740;
+  --teal:#5ec2d8;
+  --teal-soft:#12313a;
+  --good:#67c99a;
+  --good-soft:#122c22;
+  --warn:#e0b061;
+  --warn-soft:#302512;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -16px rgba(0,0,0,.8);
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--ink);
+  font-family:'IBM Plex Serif',Georgia,serif;
+  font-size:16px;
+  line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1000px;margin:0 auto;padding:0 28px 96px}
+
+/* ── masthead ── */
+.mast{padding:64px 0 30px;border-bottom:2px solid var(--ink)}
+.kicker{
+  font-family:'IBM Plex Sans',system-ui,sans-serif;
+  font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--teal);margin:0 0 14px;
+}
+h1{
+  font-family:'IBM Plex Sans',system-ui,sans-serif;
+  font-size:clamp(30px,5vw,44px);font-weight:700;line-height:1.1;
+  letter-spacing:-.02em;margin:0 0 14px;text-wrap:balance;color:var(--ink);
+}
+.standfirst{
+  font-size:18px;line-height:1.6;color:var(--ink-2);margin:0;max-width:64ch;
+}
+.meta{
+  display:flex;flex-wrap:wrap;gap:0 28px;margin-top:26px;
+  font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:12.5px;color:var(--muted);
+}
+.meta b{
+  display:block;font-size:10.5px;font-weight:600;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--faint);margin-bottom:2px;
+}
+.meta span{font-variant-numeric:tabular-nums}
+
+/* ── sections ── */
+section{
+  display:grid;grid-template-columns:64px minmax(0,1fr);gap:0 24px;
+  padding:44px 0;border-bottom:1px solid var(--line);
+}
+.snum{
+  font-family:'IBM Plex Mono',ui-monospace,monospace;
+  font-size:13px;color:var(--faint);padding-top:6px;font-variant-numeric:tabular-nums;
+}
+h2{
+  font-family:'IBM Plex Sans',system-ui,sans-serif;
+  font-size:24px;font-weight:600;letter-spacing:-.01em;line-height:1.25;
+  margin:0 0 16px;color:var(--ink);text-wrap:balance;
+}
+h3{
+  font-family:'IBM Plex Sans',system-ui,sans-serif;
+  font-size:15px;font-weight:600;margin:28px 0 8px;color:var(--ink);
+}
+h3:first-of-type{margin-top:18px}
+p{margin:0 0 14px;max-width:68ch}
+p:last-child{margin-bottom:0}
+a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:2px}
+a:hover{text-decoration-thickness:2px}
+strong{font-weight:600;color:var(--ink)}
+code,.mono{
+  font-family:'IBM Plex Mono',ui-monospace,monospace;
+  font-size:.88em;background:var(--surface-2);border-radius:3px;padding:1px 5px;
+  color:var(--ink);
+}
+
+ul,ol{margin:0 0 14px;padding-left:22px;max-width:68ch}
+li{margin-bottom:7px}
+li::marker{color:var(--faint)}
+ul.tight li{margin-bottom:4px}
+
+/* ── tables ── */
+.scroll{overflow-x:auto;margin:0 0 16px;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:13.5px;line-height:1.5}
+th{
+  text-align:left;font-weight:600;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--muted);background:var(--surface-2);padding:10px 14px;
+  border-bottom:1px solid var(--line);white-space:nowrap;
+}
+td{padding:11px 14px;border-bottom:1px solid var(--line);color:var(--ink-2);vertical-align:top}
+tr:last-child td{border-bottom:none}
+td.id{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12.5px;color:var(--accent);white-space:nowrap}
+td b{color:var(--ink);font-weight:600}
+
+/* ── pills ── */
+.pill{
+  display:inline-block;font-family:'IBM Plex Sans',system-ui,sans-serif;
+  font-size:10.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
+  padding:2px 8px;border-radius:3px;white-space:nowrap;
+}
+.pill.lock{background:var(--good-soft);color:var(--good)}
+.pill.open{background:var(--warn-soft);color:var(--warn)}
+.pill.later{background:var(--surface-2);color:var(--muted)}
+.pill.yes{background:var(--accent-soft);color:var(--accent)}
+
+/* ── callouts ── */
+.note{
+  background:var(--surface);border:1px solid var(--line);border-radius:6px;
+  padding:16px 18px;margin:0 0 16px;box-shadow:var(--shadow);
+}
+.note .nh{
+  font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:12px;font-weight:600;
+  letter-spacing:.06em;text-transform:uppercase;color:var(--teal);margin-bottom:7px;
+}
+.note.risk .nh{color:var(--warn)}
+.note p{font-size:15px;margin-bottom:10px}
+.note p:last-child{margin-bottom:0}
+
+pre{
+  background:var(--surface);border:1px solid var(--line);border-radius:6px;
+  padding:16px 18px;overflow-x:auto;margin:0 0 16px;
+  font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12.5px;line-height:1.6;
+  color:var(--ink-2);
+}
+pre code{background:none;padding:0;font-size:inherit}
+.cmt{color:var(--faint)}
+
+/* ── phase list ── */
+.phases{display:flex;flex-direction:column;gap:10px;margin-bottom:16px}
+.phase{
+  display:grid;grid-template-columns:auto minmax(0,1fr);gap:0 16px;align-items:baseline;
+  background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--teal);
+  border-radius:0 6px 6px 0;padding:13px 16px;
+}
+.phase .pn{
+  font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12px;color:var(--teal);
+  font-weight:500;white-space:nowrap;
+}
+.phase .pt{font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:14.5px;font-weight:600;color:var(--ink);margin-bottom:3px}
+.phase .pd{font-size:14px;color:var(--muted);line-height:1.5}
+
+footer{
+  padding:34px 0 0;font-family:'IBM Plex Sans',system-ui,sans-serif;
+  font-size:12.5px;color:var(--faint);
+}
+
+@media (max-width:720px){
+  .wrap{padding:0 20px 64px}
+  section{grid-template-columns:minmax(0,1fr);gap:0;padding:34px 0}
+  .snum{padding:0 0 6px}
+  body{font-size:15.5px}
+}
+</style>
+
+<div class="wrap">
+
+<div class="mast">
+  <p class="kicker">Proof of concept · Build specification</p>
+  <h1>Technical Design Generator for SAP consultants</h1>
+  <p class="standfirst">An aXet.flows application that turns an approved Functional Specification into a review-ready Technical Design document, with the consultant confirming every section before it reaches Word.</p>
+  <div class="meta">
+    <div><b>Version</b><span>Draft 1 · 24 Aug 2026</span></div>
+    <div><b>Branch</b><span>claude/td-generator-sap-ui-igdk4n</span></div>
+    <div><b>Platform</b><span>aXet.flows 6.5 · axet-spa-app</span></div>
+    <div><b>Status</b><span>Awaiting TD template (O1)</span></div>
+  </div>
+</div>
+
+<section>
+  <div class="snum">§1</div>
+  <div>
+    <h2>What the PoC has to prove</h2>
+    <p>That a consultant can hand the tool an approved FS and get back a Technical Design good enough to send to an ABAP developer without rewriting it — and that they stay in control of every sentence on the way there.</p>
+    <p>Three things follow from that, and they are the acceptance bar:</p>
+    <ul>
+      <li><strong>Quality per type beats breadth of types.</strong> One convincing Interface TD is worth five thin ones.</li>
+      <li><strong>Nothing is invented.</strong> Enhancement names, field lengths and process steps either come from the sources or are recorded as open questions. A fabricated BAdI costs the ABAP team more than the tool saves.</li>
+      <li><strong>The consultant's edits survive.</strong> Hand-written text is never silently overwritten by a regeneration.</li>
+    </ul>
+    <p>Out of scope for the PoC: Solution Manager or Jira integration, approval workflow and e-signature, multi-user co-editing of one design, and any automatic write-back to SAP.</p>
+  </div>
+</section>
+
+<section>
+  <div class="snum">§2</div>
+  <div>
+    <h2>Decision register</h2>
+    <p>Every decision taken so far, with the reasoning compressed to one line. Referenced elsewhere in this document by ID.</p>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr><th>ID</th><th>Decision</th><th>Because</th><th>State</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="id">D1</td><td><b>React SPA</b> deployed via the <code>axet-spa-app</code> node, REST to <code>http-in</code> endpoints</td><td>A persistent shell is the only way the progress rail survives every step without re-mounting</td><td><span class="pill lock">Locked</span></td></tr>
+          <tr><td class="id">D2</td><td><b>Full draft, then section-by-section review</b> — not stage gates</td><td>Fewer blocking waits, and the consultant sees the whole document before judging any part of it</td><td><span class="pill lock">Locked</span></td></tr>
+          <tr><td class="id">D3</td><td><b>Report, Interface, Enhancement</b> built and tuned; <b>Form and Fiori</b> template-complete but flagged preview</td><td>Each type costs a schema, a template block, prompt tuning and 2–3 real FS documents to validate</td><td><span class="pill lock">Locked</span></td></tr>
+          <tr><td class="id">D4</td><td><b>DOCX only.</b> No PDF path in the PoC</td><td>PDF is an infrastructure decision (LibreOffice binary, external API, or headless browser), not a feature</td><td><span class="pill lock">Locked</span></td></tr>
+          <tr><td class="id">D5</td><td><b>One primary source + up to five supporting documents</b>, each with a declared role and explicit precedence</td><td>Real inputs are plural; a flat pile silently merges FS v1 and v2 and nobody catches it</td><td><span class="pill lock">Locked</span></td></tr>
+          <tr><td class="id">D6</td><td><b>Diagrams gated by TD type</b>, generated as Mermaid and editable before render</td><td>A forced diagram the sources cannot support is worse than no diagram</td><td><span class="pill lock">Locked</span></td></tr>
+          <tr><td class="id">D7</td><td><b>Direct text editing and AI revision, both</b>, with an explicit collision rule</td><td>Revision-only (the current FS agent behaviour) is the first thing consultants will complain about</td><td><span class="pill lock">Locked</span></td></tr>
+          <tr><td class="id">D8</td><td><b>Two progress layers</b>: a five-stop workflow rail plus per-section state</td><td>A three-minute generation needs to show work, not a spinner</td><td><span class="pill lock">Locked</span></td></tr>
+          <tr><td class="id">D9</td><td><b>docxtemplater + PizZip</b> render into a corporate Word template, returned as base64</td><td>Already proven in the FS agent's <code>render_docx</code> node — no new infrastructure</td><td><span class="pill lock">Locked</span></td></tr>
+          <tr><td class="id">D10</td><td><b>Evidence extraction stage</b> between upload and generation</td><td>Six documents cannot be re-sent into twelve section prompts — context and cost both blow up</td><td><span class="pill lock">Locked</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="snum">§3</div>
+  <div>
+    <h2>The document model</h2>
+    <p>A TD is a <strong>type-invariant spine</strong> plus a <strong>type extension pack</strong>. Roughly 70% of the document is the same whatever is being built, which is what makes adding a type affordable: one schema fragment and one template block, not a new product.</p>
+
+    <h3>The spine — twelve sections</h3>
+    <p>Sections are individually switchable per design, so a small enhancement is not forced to carry an empty integration chapter. The generator's own prompt file already marks several sections as skippable; this makes that a UI control rather than a prompt edit.</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>#</th><th>Section</th><th>Carries</th></tr></thead>
+        <tbody>
+          <tr><td class="id">1</td><td><b>Document Control</b></td><td>Version, author, reviewers, related FS, transport, sign-off table</td></tr>
+          <tr><td class="id">2</td><td><b>Requirement Understanding</b></td><td>The requirement restated technically, traced to FS clauses</td></tr>
+          <tr><td class="id">3</td><td><b>Open Questions</b></td><td>Unanswered clauses and source conflicts — never guesses</td></tr>
+          <tr><td class="id">4</td><td><b>Proposed Solution</b></td><td>Standard vs custom, alternatives considered, chosen approach and why</td></tr>
+          <tr><td class="id">5</td><td><b>Architecture Overview</b></td><td>Systems, components, and the diagram set for this type</td></tr>
+          <tr><td class="id">6</td><td><b>Object Inventory</b></td><td>Every Z-object with name, type, package and purpose</td></tr>
+          <tr><td class="id">7</td><td><b>Data Design</b></td><td>DDIC objects, CDS views, field-level detail, persistence and retention</td></tr>
+          <tr><td class="id">8</td><td><b>Processing Logic</b></td><td>Step-by-step logic in functional language — no ABAP</td></tr>
+          <tr><td class="id">9</td><td><b>Integration Design</b></td><td>Inbound and outbound interfaces, protocols, triggers, reconciliation</td></tr>
+          <tr><td class="id">10</td><td><b>Security &amp; Authorization</b></td><td>Auth objects, roles, sensitive data handling, logging hygiene</td></tr>
+          <tr><td class="id">11</td><td><b>Error Handling</b></td><td>Exception paths, Application Log, restart and reprocessing</td></tr>
+          <tr><td class="id">12</td><td><b>Testing &amp; Validation</b></td><td>Unit and integration scenarios, negative paths, acceptance criteria</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Type extension packs</h3>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Type</th><th>PoC</th><th>Adds to the spine</th></tr></thead>
+        <tbody>
+          <tr><td><b>Report</b></td><td><span class="pill yes">Built</span></td><td>Selection screen, ALV/output layout, sorting and subtotals, spool behaviour</td></tr>
+          <tr><td><b>Interface</b></td><td><span class="pill yes">Built</span></td><td>Message structure, field mapping table, protocol and middleware, trigger and frequency, retry and reprocessing, idempotency, monitoring (AIF / SXMB_MONI)</td></tr>
+          <tr><td><b>Enhancement</b></td><td><span class="pill yes">Built</span></td><td>Enhancement point identification, impact on standard behaviour, upgrade and regression risk, fallback where no BAdI exists</td></tr>
+          <tr><td><b>Form</b></td><td><span class="pill later">Preview</span></td><td>Form layout, output determination (NAST / BRF+), print program, language and variant handling</td></tr>
+          <tr><td><b>Fiori</b></td><td><span class="pill later">Preview</span></td><td>App type (elements vs freestyle), OData service and annotations, roles/catalogs/tiles, Launchpad config, extensibility approach</td></tr>
+          <tr><td>Conversion</td><td><span class="pill later">Phase 2</span></td><td>Deliverable is a mapping specification plus Migration Cockpit config — different input shape, needs its own intake</td></tr>
+          <tr><td>Workflow</td><td><span class="pill later">Phase 2</span></td><td>Agent determination, deadlines and escalation, decision tables; diagram-dominated</td></tr>
+          <tr><td>BTP / Extension</td><td><span class="pill later">Phase 2</span></td><td>CAP/RAP/CPI design is the least standardised material and the highest hallucination risk</td></tr>
+          <tr><td>CDS / Analytical</td><td><span class="pill later">Phase 2</span></td><td>Cheap addition — structurally a variation on the Report pack</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Each type is one JSON schema in a registry, keyed by type ID, declaring its sections and per-field types (<code>text</code>, <code>table</code> with named columns, <code>choice</code>). The schema drives the prompt <em>and</em> the Word render, so the two cannot drift apart.</p>
+  </div>
+</section>
+
+<section>
+  <div class="snum">§4</div>
+  <div>
+    <h2>Input model</h2>
+    <p>Exactly one primary source, plus up to five supporting documents. Every document declares a role, and the role decides what it is allowed to do.</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Role</th><th>Count</th><th>Contributes</th><th>Precedence</th></tr></thead>
+        <tbody>
+          <tr><td><b>Primary — approved FS or BRD</b></td><td>Exactly 1</td><td>The requirement of record</td><td>Wins every conflict</td></tr>
+          <tr><td>Meeting notes / workshop minutes</td><td>0–5</td><td>Detail and clarification</td><td>Adds; cannot override primary</td></tr>
+          <tr><td>Mapping / sample data</td><td>0–5</td><td>Field-level tables</td><td>Authoritative for field detail</td></tr>
+          <tr><td>Reference TD</td><td>0–2</td><td><b>Format and tone only</b></td><td>Never contributes content</td></tr>
+          <tr><td>Screenshots / mock-ups</td><td>0–5</td><td>Layouts, selection screens</td><td>Adds</td></tr>
+          <tr><td>Standards &amp; naming conventions</td><td>0–2</td><td>Z-naming, package and transport rules</td><td>Overrides model defaults</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note risk">
+      <div class="nh">The failure this design prevents</div>
+      <p>Someone uploads FS v1 <em>and</em> FS v2. The model merges them silently, and the TD contains a requirement that was removed in review. The output looks confident, nobody catches it, and the PoC is over. Hence: one primary, declared precedence, and <strong>conflicts surface as open questions rather than being resolved</strong>.</p>
+    </div>
+
+    <h3>Evidence extraction (D10)</h3>
+    <p>Each document is parsed <strong>once</strong> into a structured evidence pack — facts, tables and open items, each carrying a source reference — and the section prompts consume the pack, never the raw files. Without this, six documents multiplied by twelve sections exhausts the context window and makes the cost per design scale with document count.</p>
+    <p>The evidence pack is also what makes multi-source safe to trust: every generated statement can point at <em>document, clause</em>, which is what the review panel displays.</p>
+  </div>
+</section>
+
+<section>
+  <div class="snum">§5</div>
+  <div>
+    <h2>Workflow and progress</h2>
+    <p>Five stops, fixed for the life of a design. The rail is mounted once by the SPA shell, above the router, so changing step swaps only the panel beneath it.</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Stop</th><th>The consultant does</th><th>The system does</th></tr></thead>
+        <tbody>
+          <tr><td class="id">1 · Source</td><td>Uploads the primary FS and any supporting documents, assigning a role to each</td><td>Parses each document and builds the evidence pack; reports what it found and what it could not</td></tr>
+          <tr><td class="id">2 · Scope</td><td>Confirms the requirement understanding, TD type, system context, section list, diagram set; answers open clauses</td><td>Suggests type and context from the evidence; flags conflicts between sources</td></tr>
+          <tr><td class="id">3 · Generate</td><td>Waits, or leaves — generation continues server-side</td><td>One LLM call per section against the evidence pack, streaming per-section state</td></tr>
+          <tr><td class="id">4 · Review</td><td>Reads, edits, revises and confirms each section</td><td>Runs quality checks; regenerates single sections on request; tracks provenance</td></tr>
+          <tr><td class="id">5 · Deliver</td><td>Downloads the Word document</td><td>Renders confirmed JSON into the corporate template; stores the version on the session</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h3>Rules the rail obeys</h3>
+    <ul class="tight">
+      <li>The underline is weighted by <strong>sections confirmed</strong> — never elapsed time, never a creep to 90%.</li>
+      <li>It never runs backwards. Regenerating one section at stop 4 does not drop the rail to stop 3.</li>
+      <li>A completed stop is a link; consultants revisit scope constantly and must not restart to fix a package name.</li>
+      <li>State lives on the server session, so closing the tab and returning tomorrow restores the same stop, mid-review.</li>
+      <li>A stop can show <em>needs attention</em> (unanswered questions) or <em>failed</em> (generation error, retry from here) without losing its place.</li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <div class="snum">§6</div>
+  <div>
+    <h2>Generation and guardrails</h2>
+    <p>One LLM call per section. Each call receives the section's schema, the evidence pack, the confirmed scope, and the sections already confirmed — and must return strict JSON matching the schema. A malformed response gets exactly one repair retry before the section is marked failed and offered for manual retry.</p>
+    <h3>Guardrails, enforced in the prompt and surfaced in the UI</h3>
+    <ul>
+      <li><strong>No invented SAP object names.</strong> BAdIs, exits, BAPIs and enhancement spots are named only when they can be grounded; otherwise the text says which enhancement <em>area</em> to investigate and assigns validation to the ABAP team. Anything unverified is flagged in review.</li>
+      <li><strong>No ABAP.</strong> This is a design, not an implementation — no class names, method signatures or code blocks.</li>
+      <li><strong>No silent gap-filling.</strong> An unanswered clause becomes an open question in section 3 and travels into the delivered document.</li>
+      <li><strong>Naming conventions are honoured</strong> where a standards document was supplied, and flagged as assumed where it was not.</li>
+      <li><strong>Reference TDs are style-only.</strong> Content bleed from another client's design is both a quality failure and a confidentiality one.</li>
+    </ul>
+    <div class="note">
+      <div class="nh">Quality checks shown in review</div>
+      <p>The checks panel is what makes the guardrails visible rather than merely instructed: unverified enhancement names, field definitions that contradict the FS, sections with no negative-path test case, and mandatory schema fields left thin. Each finding offers a targeted fix rather than a whole-section regeneration.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="snum">§7</div>
+  <div>
+    <h2>Diagrams</h2>
+    <p>Diagrams are generated as Mermaid source, rendered to SVG in the browser, approved or edited by the consultant, then converted to PNG and embedded by the docxtemplater image module. This is the only place in the product where an image is generated, and it is generated from structured text — never drawn by an image model.</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Type</th><th>Functional / process flow</th><th>Technical architecture</th><th>Also</th></tr></thead>
+        <tbody>
+          <tr><td><b>Report</b></td><td>Mandatory</td><td>—</td><td>Data-source diagram when several CDS views or tables join</td></tr>
+          <tr><td><b>Interface</b></td><td>Optional</td><td><b>Mandatory</b></td><td><b>Sequence diagram mandatory</b> — lifelines, numbered messages, ack and error branch</td></tr>
+          <tr><td><b>Enhancement</b></td><td><b>Mandatory</b></td><td>—</td><td>Must show where in the standard process the enhancement fires</td></tr>
+          <tr><td><b>Form</b></td><td>Mandatory</td><td>—</td><td>Trigger → output determination → form → channel</td></tr>
+          <tr><td><b>Fiori</b></td><td>Mandatory (screen flow)</td><td><b>Mandatory</b></td><td>App → OData → CDS → backend, plus Launchpad and gateway</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Two implementation details worth budgeting for: render SVG to PNG at 2–3× scale or the diagram is visibly soft in Word, and give the image module explicit dimensions or the picture floats unpredictably in the page flow.</p>
+  </div>
+</section>
+
+<section>
+  <div class="snum">§8</div>
+  <div>
+    <h2>Review and edit</h2>
+    <p>Both editing modes exist (D7). The design work is entirely in how they coexist, because regeneration destroys manual edits and must never do so silently.</p>
+    <h3>Collision rule</h3>
+    <p>Once a section carries manual edits, <strong>Regenerate</strong> asks which is meant:</p>
+    <ul class="tight">
+      <li><em>Revise including my edits</em> — the edited text is sent as the base. <strong>Default.</strong></li>
+      <li><em>Regenerate from scratch</em> — edits are discarded, and the dialog says so plainly.</li>
+    </ul>
+    <h3>Further rules</h3>
+    <ul>
+      <li><strong>Section-level only.</strong> Whole-document regeneration after eight confirmed sections is catastrophic and does not exist in the UI.</li>
+      <li><strong>Provenance per section</strong> — AI drafted / AI revised / human edited. Reviewers need to know what a person vouched for, and the share of hand-edited sections is the single best measure of how good generation actually is.</li>
+      <li><strong>The last few versions of each section are kept</strong> on the session, so Revise is reversible. It is JSON; it is cheap; reversibility is what makes people willing to press the button.</li>
+      <li><strong>Editing is not confirming.</strong> They are separate acts — confirmation is what drives the rail.</li>
+      <li><strong>No free rich-text editor.</strong> Anything the Word template cannot represent disappears silently at render. Use a per-field-type editor: textarea for text fields, editable grid for table fields.</li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <div class="snum">§9</div>
+  <div>
+    <h2>Delivery and the template contract</h2>
+    <p>The renderer fills a corporate Word template with confirmed JSON and returns base64, exactly as the FS agent's <code>render_docx</code> node already does. Until the official template arrives (O1), development runs against a placeholder contract so that swapping in the real one is a file swap and a tag mapping — not a redesign.</p>
+    <h3>Tag contract</h3>
+    <pre><code>{doc_title}  {doc_version}  {author}  {transport}   <span class="cmt">// scalars</span>
+{#object_inventory}{object}{type}{purpose}{/object_inventory}   <span class="cmt">// table loop</span>
+{#open_questions}{question}{raised_by}{/open_questions}
+{%architecture_diagram}                              <span class="cmt">// image tag</span>
+{#sections}{heading}{body}{/sections}                <span class="cmt">// optional sections</span></code></pre>
+    <div class="note risk">
+      <div class="nh">Word breaks docxtemplater tags silently</div>
+      <p>A placeholder typed in Word can be split across XML runs by autocorrect, spellcheck or a mid-word formatting change. The tag then renders as <strong>nothing</strong>, with no error. Any supplied template needs a tag-normalisation pass, and that pass has to be repeated whenever someone edits the template in Word. Budget for it as recurring work, not a one-off.</p>
+    </div>
+    <p>What is needed to close O1: the <code>.docx</code> or <code>.dotx</code> itself; which sections delivery governance treats as mandatory; and the header, footer, version-table and document-control conventions. Absent all three, a defensible default is authored from the structure already in the generator's prompt file.</p>
+  </div>
+</section>
+
+<section>
+  <div class="snum">§10</div>
+  <div>
+    <h2>Architecture</h2>
+    <p>A React SPA served by the <code>axet-spa-app</code> node, talking to <code>http-in</code> / <code>http-response</code> endpoints on the same aXet.flows instance. The SPA reads <code>window.AXET_CONFIG.flowsBaseUrl</code> for the API base and sends <code>withCredentials: true</code> so the Okta session cookie reaches the backend.</p>
+    <h3>Endpoints</h3>
+    <pre><code>POST   /td/session                          <span class="cmt">create, returns sessionId</span>
+POST   /td/session/:id/documents            <span class="cmt">upload + role</span>
+DELETE /td/session/:id/documents/:docId
+POST   /td/session/:id/extract              <span class="cmt">build evidence pack</span>
+POST   /td/session/:id/scope                <span class="cmt">type, context, sections, answers</span>
+POST   /td/session/:id/generate             <span class="cmt">returns immediately</span>
+GET    /td/session/:id                      <span class="cmt">full state — the poll target</span>
+PUT    /td/session/:id/section/:key         <span class="cmt">manual edit</span>
+POST   /td/session/:id/section/:key/revise  <span class="cmt">AI revision + instruction</span>
+POST   /td/session/:id/section/:key/confirm
+POST   /td/session/:id/render               <span class="cmt">docx, base64</span>
+GET    /td/designs                          <span class="cmt">dashboard list</span></code></pre>
+    <h3>Node mapping</h3>
+    <ul class="tight">
+      <li><code>deptapps-app-auth-okta</code> — authentication, roles from the users collection</li>
+      <li><code>axet-spa-app</code> — serves the built SPA, injects <code>AXET_CONFIG</code></li>
+      <li><code>function</code> — session controller, evidence extraction, prompt building, response parsing, render</li>
+      <li><code>enabler-llm</code> — one node, called per section</li>
+      <li><code>nosql-persist</code> / <code>nosql-find-one</code> / <code>nosql-query</code> / <code>nosql-remove</code> — session and design store</li>
+    </ul>
+    <h3>Session document</h3>
+    <pre><code>{
+  sessionId, owner, createdAt, updatedAt, status,
+  documents: [{ docId, name, role, pages, parsedAt }],
+  evidence:  { facts[], tables[], openItems[], conflicts[] },
+  scope:     { tdType, release, module, package, transport,
+               sections[], diagrams[], answers{} },
+  sections:  { &lt;key&gt;: { status, provenance, content,
+                        history[], checks[], sources[] } },
+  render:    { fileName, base64, version, renderedAt }
+}</code></pre>
+    <div class="note risk">
+      <div class="nh">Open: synchronous or polled generation (O2)</div>
+      <p>Per-section generation assumes 10–20 seconds a call. If <code>http-in</code> enforces a hard request timeout in this deployment, generation must be fire-and-poll: <code>/generate</code> returns immediately and the SPA polls <code>GET /td/session/:id</code>. The UI is drawn for that already; only the endpoint contract changes. This needs confirming against the actual runtime before §10 is built.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="snum">§11</div>
+  <div>
+    <h2>Limits and non-functionals</h2>
+    <ul class="tight">
+      <li><strong>Documents</strong> — 1 primary + 5 supporting, 20 MB each, <code>.docx</code> and <code>.pdf</code>.</li>
+      <li><strong>Authentication</strong> — Okta via the existing config; roles from the users collection, not Okta groups.</li>
+      <li><strong>Persistence</strong> — every design is a session document; work survives reload, tab close and container restart.</li>
+      <li><strong>Confidentiality</strong> — client FS content stays inside the tenant. This is the reason PDF conversion via an external API is refused in D4.</li>
+      <li><strong>Accessibility</strong> — keyboard reachable throughout, visible focus, the rail exposed as an ordered list with current-step state, and no meaning carried by colour alone (the check pills pair colour with a label).</li>
+      <li><strong>Auditability</strong> — provenance per section plus render versions give a defensible trail of what the AI wrote and what a person changed.</li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <div class="snum">§12</div>
+  <div>
+    <h2>Build plan</h2>
+    <div class="phases">
+      <div class="phase"><div class="pn">P0</div><div><div class="pt">Template and schema</div><div class="pd">Prepare the Word template and normalise its tags; author the spine schema plus the Report pack; agree the tag contract. Blocked on O1.</div></div></div>
+      <div class="phase"><div class="pn">P1</div><div><div class="pt">Spine end to end, Report only</div><div class="pd">SPA shell and rail, single-document upload, scope, per-section generation, review with edit and confirm, docx render and download. The first proof that the loop closes.</div></div></div>
+      <div class="phase"><div class="pn">P2</div><div><div class="pt">Multi-document and evidence extraction</div><div class="pd">Roles, precedence, conflict detection, evidence pack. Source screen becomes a document manager.</div></div></div>
+      <div class="phase"><div class="pn">P3</div><div><div class="pt">Interface and Enhancement packs</div><div class="pd">Two more schemas and template blocks, prompt tuning against real FS documents, the diagram matrix and Mermaid pipeline.</div></div></div>
+      <div class="phase"><div class="pn">P4</div><div><div class="pt">Review depth</div><div class="pd">Quality checks panel, provenance, section history and revert, the regeneration collision dialog.</div></div></div>
+      <div class="phase"><div class="pn">P5</div><div><div class="pt">Form and Fiori preview</div><div class="pd">Schema and template only, surfaced as preview types — the demonstration that the registry extends.</div></div></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="snum">§13</div>
+  <div>
+    <h2>Open items</h2>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>ID</th><th>Item</th><th>Blocks</th><th>Needed from</th></tr></thead>
+        <tbody>
+          <tr><td class="id">O1</td><td><b>The corporate TD Word template</b> — file, mandatory sections, header/footer and version-table conventions</td><td>P0, and therefore the shape of every schema</td><td>Delivery team</td></tr>
+          <tr><td class="id">O2</td><td><b>Hard request timeout on <code>http-in</code></b> in this deployment</td><td>Whether generation is synchronous or fire-and-poll</td><td>Platform check</td></tr>
+          <tr><td class="id">O3</td><td><b>Confirmation of the twelve-section spine</b> against how TDs are actually reviewed here</td><td>Schema authoring</td><td>Practice lead</td></tr>
+          <tr><td class="id">O4</td><td><b>Model choice.</b> The FS agent runs <code>gpt-4o-mini</code>; strict per-section JSON over a large evidence pack may need a stronger model</td><td>Cost and quality baseline</td><td>Trial during P1</td></tr>
+          <tr><td class="id">O5</td><td><b>Direct handoff from the FS agent</b> — same store, no re-parsing, perfect traceability</td><td>Nothing; it is additive to the Source screen</td><td>Decision after P2</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<footer>
+  Companion to the UI layout canvas · sources in <code>design/</code>, this document in <code>docs/</code> on branch <code>claude/td-generator-sap-ui-igdk4n</code>
+</footer>
+
+</div>
